@@ -1,0 +1,4 @@
+models:
+    Category: { name: string, type: 'string nullable' }
+    Transaction: { title: 'string nullable', amount: decimal, type: string, category_id: 'integer nullable', date: "date default:'2025-07-15 00:43:21'" }
+    User: { name: string, email: string, email_verified_at: 'datetime nullable', password: string, remember_token: 'string nullable' }

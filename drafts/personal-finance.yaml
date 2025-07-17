@@ -1,0 +1,26 @@
+models:
+  Category:
+    name: string
+    type: enum:income,expense
+    timestamps
+
+  Transaction:
+    title: string nullable
+    amount: decimal:10,2
+    type: enum:income,expense
+    category_id: id foreign
+    date: date default:now
+    timestamps
+
+controllers:
+  Transaction:
+    index
+    store
+    update
+    destroy
+
+  Category:
+    index
+    store
+    update
+    destroy
