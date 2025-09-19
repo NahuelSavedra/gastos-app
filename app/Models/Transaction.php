@@ -15,6 +15,7 @@ class Transaction extends Model
         'category_id',
         'date',
         'account_id',
+        'reference_id',
     ];
 
     protected $casts = [
@@ -71,6 +72,37 @@ class Transaction extends Model
     {
         return $query->whereMonth('created_at', now()->month)
             ->whereYear('created_at', now()->year);
+    }
+    /**
+     * Verificar si es una transferencia
+     */
+    public function isTransfer(): bool
+    {
+        return $this->category && $this->category->name === 'Transfer';
+    }
+
+    /**
+     * Obtener la transacción relacionada (para transferencias)
+     */
+    public function relatedTransfer()
+    {
+        if (!$this->reference_id) {
+            return null;
+        }
+
+        return static::where('reference_id', $this->reference_id)
+            ->where('id', '!=', $this->id)
+            ->first();
+    }
+
+    /**
+     * Scope para transferencias
+     */
+    public function scopeTransfers($query)
+    {
+        return $query->whereHas('category', function ($q) {
+            $q->where('name', 'Transfer');
+        });
     }
 }
 

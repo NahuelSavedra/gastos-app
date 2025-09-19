@@ -2,14 +2,17 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Resources\TransactionResource\Pages\CreateTransaction;
 use App\Filament\Resources\TransactionResource\Pages;
-use App\Filament\Resources\TransactionResource\RelationManagers;
 use App\Models\Category;
 use App\Models\Transaction;
+use App\Models\Account;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Forms\Get;
+use Filament\Forms\Set;
 use Filament\Tables\Table;
 
 class TransactionResource extends Resource
@@ -24,65 +27,190 @@ class TransactionResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\Grid::make(2)->schema([
-                    Forms\Components\TextInput::make('title')
-                        ->label('Title')
-                        ->maxLength(120),
+                // Card principal con mejor organización visual
+                Forms\Components\Card::make()
+                    ->schema([
+                        // Selector de tipo de transacción mejorado
+                        Forms\Components\Select::make('transaction_type')
+                            ->label('💰 Tipo de Operación')
+                            ->options([
+                                'income' => '📈 Ingreso',
+                                'expense' => '📉 Gasto',
+                                'transfer' => '🔄 Transferencia entre cuentas',
+                            ])
+                            ->default('expense')
+                            ->required()
+                            ->live() // Actualiza campos en tiempo real
+                            ->afterStateUpdated(function (Set $set, $state) {
+                                // Limpiar campos cuando cambia el tipo
+                                if ($state === 'transfer') {
+                                    $set('type', null);
+                                    $set('category_id', null);
+                                } else {
+                                    $set('type', $state);
+                                    $set('from_account_id', null);
+                                    $set('to_account_id', null);
+                                }
+                            }),
+                    ])
+                    ->columnSpan('full'),
 
-                    Forms\Components\TextInput::make('amount')
-                        ->label('Amount')
-                        ->numeric()
-                        ->minValue(0.01)
-                        ->required()
-                        ->rule('decimal:0,2'),
+                // Card para campos básicos
+                Forms\Components\Card::make()
+                    ->schema([
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                // Título dinámico según el tipo
+                                Forms\Components\TextInput::make('title')
+                                    ->label(fn (Get $get): string => match ($get('transaction_type')) {
+                                        'transfer' => '🏷️ Concepto de Transferencia',
+                                        'income' => '🏷️ Concepto del Ingreso',
+                                        'expense' => '🏷️ Concepto del Gasto',
+                                        default => '🏷️ Título',
+                                    })
+                                    ->required()
+                                    ->maxLength(255)
+                                    ->placeholder(fn (Get $get): string => match ($get('transaction_type')) {
+                                        'transfer' => 'ej: Ahorro mensual, Pago de tarjeta...',
+                                        'income' => 'ej: Salario, Freelance, Venta...',
+                                        'expense' => 'ej: Supermercado, Gasolina, Cena...',
+                                        default => 'Descripción breve...',
+                                    }),
 
-                    // El type se rellena y queda bloqueado (fuente de verdad: categoría)
-                    Forms\Components\ToggleButtons::make('type')
-                        ->label('Type')
-                        ->options([
-                            'income' => 'Income',
-                            'expense' => 'Expense',
-                        ])
-                        ->inline()
-                        ->disabled()   // no editable manualmente
-                        ->dehydrated(),// se guarda su valor
+                                // Monto con formato de moneda
+                                Forms\Components\TextInput::make('amount')
+                                    ->label('💵 Monto')
+                                    ->required()
+                                    ->numeric()
+                                    ->prefix('$')
+                                    ->minValue(0.01)
+                                    ->step(0.01)
+                                    ->placeholder('0.00'),
+                            ]),
 
-                    Forms\Components\Select::make('category_id')
-                        ->label('Category')
-                        ->relationship('category', 'name')
-                        ->searchable()
-                        ->preload()
-                        ->required()
-                        // al cambiar de categoría, setear 'type' según la categoría elegida
-                        ->live()
-                        ->afterStateUpdated(function ($state, callable $set) {
-                            $type = Category::query()->whereKey($state)->value('type');
-                            if ($type) {
-                                $set('type', $type);
-                            }
-                        }),
+                        // Fecha con valor por defecto
+                        Forms\Components\DatePicker::make('date')
+                            ->label('📅 Fecha')
+                            ->required()
+                            ->default(now())
+                            ->native(false),
+                    ])
+                    ->columnSpan('full'),
 
-                    Forms\Components\Select::make('account_id')
-                        ->label('Cuenta')
-                        ->relationship('account', 'name')
-                        ->required(),
+                // Card condicional para transacciones normales (ingreso/gasto)
+                Forms\Components\Card::make()
+                    ->schema([
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                // Cuenta (para ingresos y gastos)
+                                Forms\Components\Select::make('account_id')
+                                    ->label('🏦 Cuenta')
+                                    ->options(Account::pluck('name', 'id'))
+                                    ->required()
+                                    ->searchable()
+                                    ->preload(),
 
-                    Forms\Components\DatePicker::make('date')
-                        ->label('Date')
-                        ->displayFormat('d/m/Y')
-                        ->format('Y-m-d')
-                        ->default(now()) // default visible en el form
-                        ->native(false)   // UI consistente con Filament
-                        ->nullable(),     // opcional; si llega null, el modelo pone "hoy"
-                ])->columns(2),
+                                // Categoría (para ingresos y gastos)
+                                Forms\Components\Select::make('category_id')
+                                    ->label('🏷️ Categoría')
+                                    ->options(Category::pluck('name', 'id'))
+                                    ->required()
+                                    ->searchable()
+                                    ->preload()
+                                    ->createOptionForm([
+                                        Forms\Components\TextInput::make('name')
+                                            ->label('Nombre de la categoría')
+                                            ->required()
+                                            ->maxLength(255),
+                                        Forms\Components\ColorPicker::make('color')
+                                            ->label('Color')
+                                            ->default('#3B82F6'),
+                                    ]),
+                            ]),
+                    ])
+                    ->visible(fn (Get $get): bool =>
+                    in_array($get('transaction_type'), ['income', 'expense'])
+                    )
+                    ->columnSpan('full'),
 
-                Forms\Components\Textarea::make('description')
-                    ->label('Description')
-                    ->rows(3)
-                    ->maxLength(1000)
-                    ->columnSpanFull(),
+                // Card condicional para transferencias
+                Forms\Components\Card::make()
+                    ->schema([
+                        Forms\Components\Section::make('🔄 Configuración de Transferencia')
+                            ->description('Selecciona las cuentas origen y destino para la transferencia')
+                            ->schema([
+                                Forms\Components\Grid::make(2)
+                                    ->schema([
+                                        // Cuenta origen
+                                        Forms\Components\Select::make('from_account_id')
+                                            ->label('📤 Cuenta Origen')
+                                            ->options(Account::pluck('name', 'id'))
+                                            ->required()
+                                            ->searchable()
+                                            ->preload()
+                                            ->live()
+                                            ->afterStateUpdated(function (Set $set, $state, Get $get) {
+                                                // Evitar que origen y destino sean iguales
+                                                if ($state === $get('to_account_id')) {
+                                                    $set('to_account_id', null);
+                                                }
+                                            }),
+
+                                        // Cuenta destino
+                                        Forms\Components\Select::make('to_account_id')
+                                            ->label('📥 Cuenta Destino')
+                                            ->options(fn (Get $get) =>
+                                            Account::where('id', '!=', $get('from_account_id'))
+                                                ->pluck('name', 'id')
+                                            )
+                                            ->required()
+                                            ->searchable()
+                                            ->preload()
+                                            ->live(),
+                                    ]),
+
+                                // Vista previa de la transferencia
+                                Forms\Components\Placeholder::make('transfer_preview')
+                                    ->label('📋 Resumen de Transferencia')
+                                    ->content(function (Get $get): string {
+                                        $fromAccount = $get('from_account_id') ?
+                                            Account::find($get('from_account_id'))?->name : 'Seleccionar';
+                                        $toAccount = $get('to_account_id') ?
+                                            Account::find($get('to_account_id'))?->name : 'Seleccionar';
+                                        $amount = $get('amount') ? '$' . number_format($get('amount'), 2) : '$0.00';
+
+                                        return "💸 {$fromAccount} → 💰 {$toAccount} | Monto: {$amount}";
+                                    })
+                                    ->visible(fn (Get $get): bool =>
+                                        $get('from_account_id') && $get('to_account_id') && $get('amount')
+                                    ),
+                            ])
+                    ])
+                    ->visible(fn (Get $get): bool => $get('transaction_type') === 'transfer')
+                    ->columnSpan('full'),
+
+                // Descripción opcional
+                Forms\Components\Card::make()
+                    ->schema([
+                        Forms\Components\Textarea::make('description')
+                            ->label('📝 Descripción (Opcional)')
+                            ->maxLength(500)
+                            ->rows(3)
+                            ->placeholder('Detalles adicionales sobre esta transacción...'),
+                    ])
+                    ->columnSpan('full'),
+
+                // Campos ocultos para el procesamiento
+                Forms\Components\Hidden::make('type'),
             ]);
     }
+
+    // Sobrescribir el método de creación para manejar transferencias
+    public static function create(): CreateTransaction
+    {
+        return new CreateTransaction();
+    }
+
 
     public static function table(Table $table): Table
     {
