@@ -11,8 +11,6 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class TransactionResource extends Resource
 {
@@ -63,6 +61,11 @@ class TransactionResource extends Resource
                                 $set('type', $type);
                             }
                         }),
+
+                    Forms\Components\Select::make('account_id')
+                        ->label('Cuenta')
+                        ->relationship('account', 'name')
+                        ->required(),
 
                     Forms\Components\DatePicker::make('date')
                         ->label('Date')

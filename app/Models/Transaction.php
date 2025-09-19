@@ -14,6 +14,7 @@ class Transaction extends Model
         'type',
         'category_id',
         'date',
+        'account_id',
     ];
 
     protected $casts = [
@@ -24,6 +25,11 @@ class Transaction extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function account()
+    {
+        return $this->belongsTo(Account::class);
     }
 
     protected static function booted(): void
@@ -49,6 +55,22 @@ class Transaction extends Model
                 $tx->type = optional($tx->category()->first())->type;
             }
         });
+    }
+
+    public function scopeIncome($query)
+    {
+        return $query->where('type', 'income');
+    }
+
+    public function scopeExpense($query)
+    {
+        return $query->where('type', 'expense');
+    }
+
+    public function scopeThisMonth($query)
+    {
+        return $query->whereMonth('created_at', now()->month)
+            ->whereYear('created_at', now()->year);
     }
 }
 

@@ -13,8 +13,15 @@ return new class extends Migration
     {
         Schema::create('accounts', function (Blueprint $table) {
             $table->id();
+            $table->string('name'); // Ej: "MercadoPago", "Banco Galicia", "Efectivo"
+            $table->decimal('balance', 12, 2)->default(0); // saldo actual
             $table->timestamps();
         });
+
+        Schema::table('transactions', function (Blueprint $table) {
+            $table->foreignId('account_id')->constrained()->cascadeOnDelete();
+        });
+
     }
 
     /**

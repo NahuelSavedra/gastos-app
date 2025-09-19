@@ -2,35 +2,49 @@
 namespace App\Filament\Widgets;
 
 use App\Models\Transaction;
-use Filament\Tables;
+use Filament\Tables\Table;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Widgets\TableWidget as BaseWidget;
 
 class TransactionsTable extends BaseWidget
 {
-    protected int|string|array $columnSpan = 'full';
+    protected static ?string $heading = '📋 Transacciones Recientes';
+    protected static ?int $sort = 4; // ⭐ CUARTO LUGAR (último)
+    protected int | string | array $columnSpan = 'full';
+    protected static ?string $pollingInterval = '5m'; // Menos frecuente
 
-    public function table(Tables\Table $table): Tables\Table
+    public function table(Table $table): Table
     {
         return $table
-            ->query(Transaction::query()->latest('date'))
+            ->query(Transaction::with(['account', 'category'])->latest())
             ->columns([
-                Tables\Columns\TextColumn::make('date')
-                    ->label('Fecha')
-                    ->date('d/m/Y')
+                TextColumn::make('created_at')
+                    ->label('📅 Fecha')
+                    ->date('d/M/Y')
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('category.name')
-                    ->label('Categoría'),
+                TextColumn::make('category.name')
+                    ->label('🏷️ Categoría')
+                    ->searchable(),
 
-                Tables\Columns\TextColumn::make('description')
-                    ->label('Descripción'),
+                TextColumn::make('description')
+                    ->label('📝 Descripción')
+                    ->limit(30)
+                    ->searchable(),
 
-                Tables\Columns\TextColumn::make('amount')
-                    ->label('Monto')
-                    ->money('ARS') // o tu moneda
-                    ->color(fn ($record) => $record->type === 'income' ? 'success' : 'danger'),
+                TextColumn::make('amount')
+                    ->label('💵 Monto')
+                    ->formatStateUsing(fn ($state, $record): string =>
+                        ($record->type === 'expense' ? '-' : '+') .
+                        '$' . number_format($state, 2)
+                    )
+                    ->color(fn ($record): string =>
+                    $record->type === 'income' ? 'success' : 'danger'
+                    )
+                    ->sortable(),
             ])
-            ->paginated([10, 25, 50])
-            ->defaultSort('date', 'desc');
+            ->defaultPaginationPageOption(5) // Solo 5 transacciones por página
+            ->striped()
+            ->defaultSort('created_at', 'desc');
     }
 }
