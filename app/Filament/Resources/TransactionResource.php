@@ -14,6 +14,7 @@ use Filament\Tables;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
 use Filament\Tables\Table;
+use Filament\Actions\Action;
 
 class TransactionResource extends Resource
 {
@@ -27,57 +28,18 @@ class TransactionResource extends Resource
     {
         return $form
             ->schema([
-                // Card principal con mejor organización visual
-                Forms\Components\Card::make()
-                    ->schema([
-                        // Selector de tipo de transacción mejorado
-                        Forms\Components\Select::make('transaction_type')
-                            ->label('💰 Tipo de Operación')
-                            ->options([
-                                'income' => '📈 Ingreso',
-                                'expense' => '📉 Gasto',
-                                'transfer' => '🔄 Transferencia entre cuentas',
-                            ])
-                            ->default('expense')
-                            ->required()
-                            ->live() // Actualiza campos en tiempo real
-                            ->afterStateUpdated(function (Set $set, $state) {
-                                // Limpiar campos cuando cambia el tipo
-                                if ($state === 'transfer') {
-                                    $set('type', null);
-                                    $set('category_id', null);
-                                } else {
-                                    $set('type', $state);
-                                    $set('from_account_id', null);
-                                    $set('to_account_id', null);
-                                }
-                            }),
-                    ])
-                    ->columnSpan('full'),
-
-                // Card para campos básicos
                 Forms\Components\Card::make()
                     ->schema([
                         Forms\Components\Grid::make(2)
                             ->schema([
-                                // Título dinámico según el tipo
+                                // Concepto
                                 Forms\Components\TextInput::make('title')
-                                    ->label(fn (Get $get): string => match ($get('transaction_type')) {
-                                        'transfer' => '🏷️ Concepto de Transferencia',
-                                        'income' => '🏷️ Concepto del Ingreso',
-                                        'expense' => '🏷️ Concepto del Gasto',
-                                        default => '🏷️ Título',
-                                    })
+                                    ->label('🏷️ Concepto')
                                     ->required()
                                     ->maxLength(255)
-                                    ->placeholder(fn (Get $get): string => match ($get('transaction_type')) {
-                                        'transfer' => 'ej: Ahorro mensual, Pago de tarjeta...',
-                                        'income' => 'ej: Salario, Freelance, Venta...',
-                                        'expense' => 'ej: Supermercado, Gasolina, Cena...',
-                                        default => 'Descripción breve...',
-                                    }),
+                                    ->placeholder('ej: Supermercado, Gasolina, Salario...'),
 
-                                // Monto con formato de moneda
+                                // Monto
                                 Forms\Components\TextInput::make('amount')
                                     ->label('💵 Monto')
                                     ->required()
@@ -88,124 +50,141 @@ class TransactionResource extends Resource
                                     ->placeholder('0.00'),
                             ]),
 
-                        // Fecha con valor por defecto
-                        Forms\Components\DatePicker::make('date')
-                            ->label('📅 Fecha')
-                            ->required()
-                            ->default(now())
-                            ->native(false),
-                    ])
-                    ->columnSpan('full'),
-
-                // Card condicional para transacciones normales (ingreso/gasto)
-                Forms\Components\Card::make()
-                    ->schema([
                         Forms\Components\Grid::make(2)
                             ->schema([
-                                // Cuenta (para ingresos y gastos)
-                                Forms\Components\Select::make('account_id')
-                                    ->label('🏦 Cuenta')
-                                    ->options(Account::pluck('name', 'id'))
-                                    ->required()
-                                    ->searchable()
-                                    ->preload(),
-
-                                // Categoría (para ingresos y gastos)
+                                // Categoría (define automáticamente si es ingreso/gasto/transferencia)
                                 Forms\Components\Select::make('category_id')
                                     ->label('🏷️ Categoría')
-                                    ->options(Category::pluck('name', 'id'))
+                                    ->options(function () {
+                                        return Category::orderBy('type')
+                                            ->orderBy('name')
+                                            ->get()
+                                            ->mapWithKeys(function ($category) {
+                                                $icon = match($category->type) {
+                                                    'income' => '📈',
+                                                    'expense' => '📉',
+                                                    default => '🔄'
+                                                };
+                                                return [$category->id => "{$icon} {$category->name}"];
+                                            });
+                                    })
                                     ->required()
                                     ->searchable()
                                     ->preload()
+                                    ->live()
+                                    ->afterStateUpdated(function (Set $set, $state) {
+                                        $category = Category::find($state);
+                                        // Si es transferencia, mostramos los campos adicionales
+                                        if ($category && $category->name === 'Transferencia') {
+                                            $set('is_transfer', true);
+                                        } else {
+                                            $set('is_transfer', false);
+                                            $set('to_account_id', null);
+                                        }
+                                    })
                                     ->createOptionForm([
                                         Forms\Components\TextInput::make('name')
                                             ->label('Nombre de la categoría')
                                             ->required()
                                             ->maxLength(255),
-                                        Forms\Components\ColorPicker::make('color')
-                                            ->label('Color')
-                                            ->default('#3B82F6'),
-                                    ]),
+                                        Forms\Components\Select::make('type')
+                                            ->label('Tipo')
+                                            ->options([
+                                                'income' => '📈 Ingreso',
+                                                'expense' => '📉 Gasto',
+                                            ])
+                                            ->required()
+                                            ->default('expense'),
+                                    ])
+                                    ->createOptionUsing(function (array $data) {
+                                        return Category::create($data)->id;
+                                    }),
+
+                                // Cuenta origen (siempre visible)
+                                Forms\Components\Select::make('account_id')
+                                    ->label(fn (Get $get) => $get('is_transfer') ? '📤 Cuenta Origen' : '🏦 Cuenta')
+                                    ->options(Account::pluck('name', 'id'))
+                                    ->required()
+                                    ->searchable()
+                                    ->preload()
+                                    ->live(),
                             ]),
-                    ])
-                    ->visible(fn (Get $get): bool =>
-                    in_array($get('transaction_type'), ['income', 'expense'])
-                    )
-                    ->columnSpan('full'),
 
-                // Card condicional para transferencias
-                Forms\Components\Card::make()
-                    ->schema([
-                        Forms\Components\Section::make('🔄 Configuración de Transferencia')
-                            ->description('Selecciona las cuentas origen y destino para la transferencia')
-                            ->schema([
-                                Forms\Components\Grid::make(2)
-                                    ->schema([
-                                        // Cuenta origen
-                                        Forms\Components\Select::make('from_account_id')
-                                            ->label('📤 Cuenta Origen')
-                                            ->options(Account::pluck('name', 'id'))
-                                            ->required()
-                                            ->searchable()
-                                            ->preload()
-                                            ->live()
-                                            ->afterStateUpdated(function (Set $set, $state, Get $get) {
-                                                // Evitar que origen y destino sean iguales
-                                                if ($state === $get('to_account_id')) {
-                                                    $set('to_account_id', null);
-                                                }
-                                            }),
+                        // Cuenta destino (solo para transferencias)
+                        Forms\Components\Select::make('to_account_id')
+                            ->label('📥 Cuenta Destino')
+                            ->options(fn (Get $get) =>
+                            Account::where('id', '!=', $get('account_id'))
+                                ->pluck('name', 'id')
+                            )
+                            ->required(fn (Get $get) => $get('is_transfer'))
+                            ->searchable()
+                            ->preload()
+                            ->visible(fn (Get $get) => $get('is_transfer'))
+                            ->helperText('Cuenta a la que se transferirá el dinero'),
 
-                                        // Cuenta destino
-                                        Forms\Components\Select::make('to_account_id')
-                                            ->label('📥 Cuenta Destino')
-                                            ->options(fn (Get $get) =>
-                                            Account::where('id', '!=', $get('from_account_id'))
-                                                ->pluck('name', 'id')
-                                            )
-                                            ->required()
-                                            ->searchable()
-                                            ->preload()
-                                            ->live(),
-                                    ]),
+                        Forms\Components\DatePicker::make('date')
+                            ->label('📅 Fecha')
+                            ->required()
+                            ->default(now())
+                            ->native(false)
+                            ->closeOnDateSelection(),
 
-                                // Vista previa de la transferencia
-                                Forms\Components\Placeholder::make('transfer_preview')
-                                    ->label('📋 Resumen de Transferencia')
-                                    ->content(function (Get $get): string {
-                                        $fromAccount = $get('from_account_id') ?
-                                            Account::find($get('from_account_id'))?->name : 'Seleccionar';
-                                        $toAccount = $get('to_account_id') ?
-                                            Account::find($get('to_account_id'))?->name : 'Seleccionar';
-                                        $amount = $get('amount') ? '$' . number_format($get('amount'), 2) : '$0.00';
+                        // Indicador visual del tipo
+                        Forms\Components\Placeholder::make('type_indicator')
+                            ->label('📊 Tipo de Transacción')
+                            ->content(function (Get $get): string {
+                                if (!$get('category_id')) {
+                                    return '⚪ Selecciona una categoría';
+                                }
 
-                                        return "💸 {$fromAccount} → 💰 {$toAccount} | Monto: {$amount}";
-                                    })
-                                    ->visible(fn (Get $get): bool =>
-                                        $get('from_account_id') && $get('to_account_id') && $get('amount')
-                                    ),
-                            ])
-                    ])
-                    ->visible(fn (Get $get): bool => $get('transaction_type') === 'transfer')
-                    ->columnSpan('full'),
+                                $category = Category::find($get('category_id'));
 
-                // Descripción opcional
-                Forms\Components\Card::make()
-                    ->schema([
+                                if (!$category) {
+                                    return '⚪ Categoría no encontrada';
+                                }
+
+                                if ($category->name === 'Transferencia') {
+                                    return '🔄 Esta será una TRANSFERENCIA entre cuentas';
+                                }
+
+                                return $category->type === 'income'
+                                    ? '📈 Esta será un INGRESO'
+                                    : '📉 Esta será un GASTO';
+                            })
+                            ->visible(fn (Get $get): bool => filled($get('category_id'))),
+
+                        // Vista previa de transferencia
+                        Forms\Components\Placeholder::make('transfer_preview')
+                            ->label('📋 Resumen')
+                            ->content(function (Get $get): string {
+                                $fromAccount = $get('account_id') ?
+                                    Account::find($get('account_id'))?->name : 'Seleccionar';
+                                $toAccount = $get('to_account_id') ?
+                                    Account::find($get('to_account_id'))?->name : 'Seleccionar';
+                                $amount = $get('amount') ? '$' . number_format($get('amount'), 2) : '$0.00';
+
+                                return "💸 {$fromAccount} → 💰 {$toAccount} | Monto: {$amount}";
+                            })
+                            ->visible(fn (Get $get): bool =>
+                                $get('is_transfer') && $get('account_id') && $get('to_account_id') && $get('amount')
+                            ),
+
+                        // Descripción opcional
                         Forms\Components\Textarea::make('description')
                             ->label('📝 Descripción (Opcional)')
                             ->maxLength(500)
                             ->rows(3)
                             ->placeholder('Detalles adicionales sobre esta transacción...'),
+
+                        // Campo oculto para detectar si es transferencia
+                        Forms\Components\Hidden::make('is_transfer')
+                            ->default(false),
                     ])
                     ->columnSpan('full'),
-
-                // Campos ocultos para el procesamiento
-                Forms\Components\Hidden::make('type'),
             ]);
     }
 
-    // Sobrescribir el método de creación para manejar transferencias
     public static function create(): CreateTransaction
     {
         return new CreateTransaction();
@@ -230,22 +209,21 @@ class TransactionResource extends Resource
                     ->label('Category')
                     ->sortable()
                     ->searchable(),
-
                 Tables\Columns\TextColumn::make('type')
                     ->badge()
                     ->color(fn ($record) => $record->type === 'income' ? 'success' : 'danger')
-                    ->label('Type'),
+                    ->label('Type')
+                    ->formatStateUsing(fn ($state) => $state === 'income' ? 'Ingreso' : 'Gasto'),
 
                 Tables\Columns\TextColumn::make('amount')
                     ->label('Amount')
                     ->money('ARS', true) // ajustá tu moneda
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('description')
-                    ->label('Description')
-                    ->toggleable(isToggledHiddenByDefault: true)
-                    ->wrap()
-                    ->limit(80),
+                Tables\Columns\TextColumn::make('account.name')
+                    ->label('Account')
+                    ->sortable()
+                    ->searchable(),
             ])
             ->defaultSort('date', 'desc')
             ->filters([
@@ -254,6 +232,9 @@ class TransactionResource extends Resource
                 Tables\Filters\SelectFilter::make('category_id')
                     ->relationship('category', 'name')
                     ->label('Category'),
+                Tables\Filters\SelectFilter::make('account_id')
+                    ->relationship('account', 'name')
+                    ->label('Account'),
             ])
             ->paginated([10, 25, 50]);
     }
@@ -273,4 +254,34 @@ class TransactionResource extends Resource
             'edit' => Pages\EditTransaction::route('/{record}/edit'),
         ];
     }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            $this->quickExpenseAction('Pagar Alquiler', 1, 'heroicon-o-home'),
+            $this->quickExpenseAction('Pagar Internet', 2, 'heroicon-o-wifi'),
+            $this->quickExpenseAction('Pagar Comida', 3, 'heroicon-o-shopping-cart'),
+        ];
+    }
+
+    protected function quickExpenseAction(string $label, int $categoryId, string $icon): Action
+    {
+        return Action::make(Str::slug($label))
+            ->label($label)
+            ->icon($icon)
+            ->color('danger')
+            ->form([
+                Forms\Components\TextInput::make('amount')
+                    ->label('Monto')
+                    ->numeric()
+                    ->required(),
+            ])
+            ->action(fn ($data) => Transaction::create([
+                'type' => 'expense',
+                'category_id' => $categoryId,
+                'amount' => $data['amount'],
+                'created_at' => now(),
+            ]));
+    }
+
 }

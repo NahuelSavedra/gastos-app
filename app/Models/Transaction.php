@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 
 class Transaction extends Model
 {
@@ -11,7 +12,6 @@ class Transaction extends Model
         'title',
         'description',
         'amount',
-        'type',
         'category_id',
         'date',
         'account_id',
@@ -23,49 +23,49 @@ class Transaction extends Model
         'amount' => 'decimal:2',
     ];
 
+    protected $appends = ['type']; // Para que siempre esté disponible
+
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
     }
 
-    public function account()
+    public function account(): BelongsTo
     {
         return $this->belongsTo(Account::class);
     }
 
+    /**
+     * Accessor para obtener el type desde la categoría
+     */
+    protected function type(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->category?->type ?? 'expense',
+        );
+    }
+
     protected static function booted(): void
     {
-        // Al crear, si no hay fecha => hoy; si no hay type pero hay categoría => tomar de la categoría
         static::creating(function (Transaction $tx) {
             if (blank($tx->date)) {
                 $tx->date = now()->toDateString();
-            }
-
-            if (filled($tx->category_id) && blank($tx->type)) {
-                $tx->type = optional($tx->category()->first())->type;
-            }
-        });
-
-        // Al actualizar, si cambió la categoría y no se forzó type, sincronizar
-        static::saving(function (Transaction $tx) {
-            if (blank($tx->date)) {
-                $tx->date = now()->toDateString();
-            }
-
-            if ($tx->isDirty('category_id') && blank($tx->getDirty()['type'] ?? null)) {
-                $tx->type = optional($tx->category()->first())->type;
             }
         });
     }
 
     public function scopeIncome($query)
     {
-        return $query->where('type', 'income');
+        return $query->whereHas('category', function ($q) {
+            $q->where('type', 'income');
+        });
     }
 
     public function scopeExpense($query)
     {
-        return $query->where('type', 'expense');
+        return $query->whereHas('category', function ($q) {
+            $q->where('type', 'expense');
+        });
     }
 
     public function scopeThisMonth($query)
@@ -73,17 +73,12 @@ class Transaction extends Model
         return $query->whereMonth('created_at', now()->month)
             ->whereYear('created_at', now()->year);
     }
-    /**
-     * Verificar si es una transferencia
-     */
+
     public function isTransfer(): bool
     {
         return $this->category && $this->category->name === 'Transfer';
     }
 
-    /**
-     * Obtener la transacción relacionada (para transferencias)
-     */
     public function relatedTransfer()
     {
         if (!$this->reference_id) {
@@ -95,9 +90,6 @@ class Transaction extends Model
             ->first();
     }
 
-    /**
-     * Scope para transferencias
-     */
     public function scopeTransfers($query)
     {
         return $query->whereHas('category', function ($q) {
@@ -105,4 +97,3 @@ class Transaction extends Model
         });
     }
 }
-

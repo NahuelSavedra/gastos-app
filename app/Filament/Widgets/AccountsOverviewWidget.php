@@ -1,119 +1,90 @@
 <?php
 
-// 📁 app/Filament/Widgets/AccountsOverviewWidget.php
 namespace App\Filament\Widgets;
 
+use App\Models\Account;
+use App\Models\Transaction;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
-use App\Models\Account;
-use Filament\Tables\Columns\TextColumn;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 class AccountsOverviewWidget extends BaseWidget
 {
-    protected static ?string $heading = '🏦 Resumen de Cuentas';
-    protected static ?int $sort = 2; // ⭐ SEGUNDO LUGAR
+    protected static ?int $sort = 2;
     protected int | string | array $columnSpan = 'full';
-    protected static ?string $pollingInterval = '60s';
+    protected static ?string $heading = '🏦 Resumen de Cuentas';
 
     public function table(Table $table): Table
     {
         return $table
             ->query(
-                Account::withSum([
-                    'transactions as total_income' => function (Builder $query) {
-                        $query->where('type', 'income');
-                    }
-                ], 'amount')
-                    ->withSum([
-                        'transactions as total_expense' => function (Builder $query) {
-                            $query->where('type', 'expense');
+                Account::query()
+                    ->withCount([
+                        'transactions as income_total' => function (Builder $query) {
+                            $query->join('categories', 'transactions.category_id', '=', 'categories.id')
+                                ->where('categories.type', 'income')
+                                ->select(DB::raw('COALESCE(SUM(transactions.amount), 0)'));
+                        },
+                        'transactions as expense_total' => function (Builder $query) {
+                            $query->join('categories', 'transactions.category_id', '=', 'categories.id')
+                                ->where('categories.type', 'expense')
+                                ->select(DB::raw('COALESCE(SUM(transactions.amount), 0)'));
+                        },
+                        'transactions as transactions_count' => function (Builder $query) {
+                            $query->whereMonth('date', now()->month);
                         }
-                    ], 'amount')
-                    ->withCount('transactions as transactions_count')
+                    ])
             )
             ->columns([
-                TextColumn::make('name')
-                    ->label('🏷️ Cuenta')
-                    ->formatStateUsing(fn (string $state, Account $record): string =>
-                        $this->getAccountIcon($record->type ?? 'default') . ' ' . $state
-                    )
-                    ->weight('bold')
+                Tables\Columns\TextColumn::make('name')
+                    ->label('🏦 Cuenta')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->weight('bold'),
 
-                TextColumn::make('total_income')
+                Tables\Columns\TextColumn::make('income_total')
                     ->label('📈 Ingresos')
-                    ->formatStateUsing(fn ($state): string =>
-                        '$' . number_format($state ?? 0, 2)
-                    )
+                    ->money('ARS', true)
                     ->color('success')
                     ->sortable(),
 
-                TextColumn::make('total_expense')
+                Tables\Columns\TextColumn::make('expense_total')
                     ->label('📉 Gastos')
-                    ->formatStateUsing(fn ($state): string =>
-                        '$' . number_format($state ?? 0, 2)
-                    )
+                    ->money('ARS', true)
                     ->color('danger')
                     ->sortable(),
 
-                TextColumn::make('balance')
+                Tables\Columns\TextColumn::make('balance')
                     ->label('💰 Balance')
-                    ->getStateUsing(fn (Account $record): float =>
-                        ($record->total_income ?? 0) - ($record->total_expense ?? 0)
-                    )
-                    ->formatStateUsing(fn ($state): string =>
-                        '$' . number_format($state, 2)
-                    )
-                    ->color(fn ($state): string => match (true) {
-                        $state > 0 => 'success',
-                        $state == 0 => 'gray',
-                        default => 'danger',
+                    ->money('ARS', true)
+                    ->getStateUsing(function (Account $record): float {
+                        return ($record->income_total ?? 0) - ($record->expense_total ?? 0);
                     })
+                    ->color(fn ($state): string => $state >= 0 ? 'success' : 'warning')
                     ->weight('bold')
                     ->sortable(),
 
-                TextColumn::make('transactions_count')
-                    ->label('🔢 Movimientos')
+                Tables\Columns\TextColumn::make('transactions_count')
+                    ->label('📊 Movimientos')
                     ->suffix(' trans.')
-                    ->color('info')
+                    ->alignCenter()
                     ->sortable(),
-            ])
-            ->actions([
-                Tables\Actions\Action::make('edit')
-                    ->label('✏️')
-                    ->tooltip('Editar cuenta')
-                    ->icon('heroicon-o-pencil')
-                    ->url(fn (Account $record): string =>
-                    route('filament.app.resources.accounts.edit', $record)
-                    ),
 
-                Tables\Actions\Action::make('view_transactions')
-                    ->label('👁️')
-                    ->tooltip('Ver movimientos')
-                    ->icon('heroicon-o-eye')
-                    ->url(fn (Account $record): string =>
-                    route('filament.app.resources.transactions.index', [
-                        'tableFilters' => ['account' => ['value' => $record->id]]
-                    ])
-                    ),
+                Tables\Columns\IconColumn::make('status')
+                    ->label('Estado')
+                    ->boolean()
+                    ->getStateUsing(function (Account $record): bool {
+                        $balance = ($record->income_total ?? 0) - ($record->expense_total ?? 0);
+                        return $balance >= 0;
+                    })
+                    ->trueIcon('heroicon-o-check-circle')
+                    ->falseIcon('heroicon-o-exclamation-circle')
+                    ->trueColor('success')
+                    ->falseColor('warning'),
             ])
             ->defaultSort('balance', 'desc')
-            ->striped()
             ->paginated(false);
-    }
-
-    private function getAccountIcon($type): string
-    {
-        return match($type) {
-            'checking' => '🏦',
-            'savings' => '💎',
-            'credit_card' => '💳',
-            'cash' => '💵',
-            'investment' => '📈',
-            default => '💰'
-        };
     }
 }
