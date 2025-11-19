@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Widgets\QuickTransactionsWidget;
 use Filament\Pages\Page;
 
 class Dashboard extends Page
@@ -24,6 +25,8 @@ class Dashboard extends Page
 
             // 📋 PRIORIDAD 4: Transacciones (menos importante, al final)
             \App\Filament\Widgets\TransactionsTable::class,
+
+            QuickTransactionsWidget::class,
         ];
     }
 
