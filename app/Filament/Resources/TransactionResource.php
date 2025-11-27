@@ -2,195 +2,131 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\TransactionResource\Pages\CreateTransaction;
 use App\Filament\Resources\TransactionResource\Pages;
+use App\Filament\Resources\TransactionResource\Pages\CreateTransaction;
+use App\Models\Account;
 use App\Models\Category;
 use App\Models\Transaction;
-use App\Models\Account;
 use App\Models\TransactionTemplate;
+use Filament\Actions\Action;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
-use Filament\Forms\Get;
-use Filament\Forms\Set;
 use Filament\Tables\Table;
-use Filament\Actions\Action;
+use Illuminate\Support\Facades\Cache;
 
 class TransactionResource extends Resource
 {
     protected static ?string $model = Transaction::class;
-
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
-    protected static ?string $navigationGroup = 'Finanzas';
-    protected static ?string $modelLabel = 'Transaction';
-    protected static ?string $pluralModelLabel = 'Transactions';
+    protected static ?string $navigationLabel = 'Transacciones';
+
     public static function form(Form $form): Form
     {
-        return $form
-            ->schema([
-                Forms\Components\Card::make()
-                    ->schema([
-                        Forms\Components\Grid::make(2)
-                            ->schema([
-                                // Concepto
-                                Forms\Components\TextInput::make('title')
-                                    ->label('🏷️ Concepto')
-                                    ->required()
-                                    ->maxLength(255)
-                                    ->placeholder('ej: Supermercado, Gasolina, Salario...'),
+        return $form->schema([
+            Forms\Components\Grid::make(3)
+                ->schema([
+                    // Botones rápidos de monto (UX: entrada rápida)
+                    Forms\Components\Group::make([
+                        Forms\Components\Placeholder::make('quick_amounts')
+                            ->label('Montos Rápidos')
+                            ->content(fn() => view('filament.forms.quick-amounts')),
+                    ])->columnSpan(3),
 
-                                // Monto
-                                Forms\Components\TextInput::make('amount')
-                                    ->label('💵 Monto')
-                                    ->required()
-                                    ->numeric()
-                                    ->prefix('$')
-                                    ->minValue(0.01)
-                                    ->step(0.01)
-                                    ->placeholder('0.00'),
-                            ]),
+                    Forms\Components\Select::make('category_id')
+                        ->label('Categoría')
+                        ->options(fn() => self::getCachedCategories())
+                        ->searchable()
+                        ->required()
+                        ->live()
+                        ->afterStateUpdated(function ($state, Forms\Set $set) {
+                            $category = Category::find($state);
+                            $set('is_transfer', $category?->name === 'Transferencia');
+                        })
+                        ->columnSpan(2),
 
-                        Forms\Components\Grid::make(2)
-                            ->schema([
-                                // Categoría (define automáticamente si es ingreso/gasto/transferencia)
-                                Forms\Components\Select::make('category_id')
-                                    ->label('🏷️ Categoría')
-                                    ->options(function () {
-                                        return Category::orderBy('type')
-                                            ->orderBy('name')
-                                            ->get()
-                                            ->mapWithKeys(function ($category) {
-                                                $icon = match($category->type) {
-                                                    'income' => '📈',
-                                                    'expense' => '📉',
-                                                    default => '🔄'
-                                                };
-                                                return [$category->id => "{$icon} {$category->name}"];
-                                            });
-                                    })
-                                    ->required()
-                                    ->searchable()
-                                    ->preload()
-                                    ->live()
-                                    ->afterStateUpdated(function (Set $set, $state) {
-                                        $category = Category::find($state);
-                                        // Si es transferencia, mostramos los campos adicionales
-                                        if ($category && $category->name === 'Transferencia') {
-                                            $set('is_transfer', true);
-                                        } else {
-                                            $set('is_transfer', false);
-                                            $set('to_account_id', null);
-                                        }
-                                    })
-                                    ->createOptionForm([
-                                        Forms\Components\TextInput::make('name')
-                                            ->label('Nombre de la categoría')
-                                            ->required()
-                                            ->maxLength(255),
-                                        Forms\Components\Select::make('type')
-                                            ->label('Tipo')
-                                            ->options([
-                                                'income' => '📈 Ingreso',
-                                                'expense' => '📉 Gasto',
-                                            ])
-                                            ->required()
-                                            ->default('expense'),
-                                    ])
-                                    ->createOptionUsing(function (array $data) {
-                                        return Category::create($data)->id;
-                                    }),
+                    Forms\Components\TextInput::make('amount')
+                        ->label('Monto')
+                        ->numeric()
+                        ->required()
+                        ->prefix('$')
+                        ->inputMode('decimal')
+                        ->step(0.01)
+                        ->minValue(0.01)
+                        ->live(debounce: 300)
+                        // UX: Autoformateo mientras escribes
+                        ->formatStateUsing(fn($state) => $state ? number_format($state, 2, '.', '') : null)
+                        ->extraInputAttributes([
+                            'class' => 'text-right text-lg font-semibold',
+                        ])
+                        ->columnSpan(1),
 
-                                // Cuenta origen (siempre visible)
-                                Forms\Components\Select::make('account_id')
-                                    ->label(fn (Get $get) => $get('is_transfer') ? '📤 Cuenta Origen' : '🏦 Cuenta')
-                                    ->options(Account::pluck('name', 'id'))
-                                    ->required()
-                                    ->searchable()
-                                    ->preload()
-                                    ->live(),
-                            ]),
+                    Forms\Components\TextInput::make('title')
+                        ->label('Título')
+                        ->maxLength(255)
+                        ->columnSpan(3)
+                        // UX: Placeholder dinámico según categoría
+                        ->placeholder(fn(Forms\Get $get) =>
+                        self::getDynamicPlaceholder($get('category_id'))
+                        ),
 
-                        // Cuenta destino (solo para transferencias)
-                        Forms\Components\Select::make('to_account_id')
-                            ->label('📥 Cuenta Destino')
-                            ->options(fn (Get $get) =>
-                            Account::where('id', '!=', $get('account_id'))
-                                ->pluck('name', 'id')
-                            )
-                            ->required(fn (Get $get) => $get('is_transfer'))
-                            ->searchable()
-                            ->preload()
-                            ->visible(fn (Get $get) => $get('is_transfer'))
-                            ->helperText('Cuenta a la que se transferirá el dinero'),
+                    Forms\Components\Select::make('account_id')
+                        ->label('Cuenta Origen')
+                        ->options(fn() => self::getCachedAccounts())
+                        ->searchable()
+                        ->required()
+                        ->live()
+                        ->columnSpan(fn(Forms\Get $get) => $get('is_transfer') ? 1 : 2)
+                        // UX: Mostrar balance actual
+                        ->getOptionLabelFromRecordUsing(fn(Account $record) =>
+                        "{$record->name} (\${$record->balance})"
+                        ),
 
-                        Forms\Components\DatePicker::make('date')
-                            ->label('📅 Fecha')
-                            ->required()
-                            ->default(now())
-                            ->native(false)
-                            ->closeOnDateSelection(),
+                    Forms\Components\Select::make('to_account_id')
+                        ->label('Cuenta Destino')
+                        ->options(fn(Forms\Get $get) => self::getCachedAccounts(
+                            exclude: $get('account_id')
+                        ))
+                        ->searchable()
+                        ->required(fn(Forms\Get $get) => $get('is_transfer') === true)
+                        ->visible(fn(Forms\Get $get) => $get('is_transfer') === true)
+                        ->columnSpan(1)
+                        ->getOptionLabelFromRecordUsing(fn(Account $record) =>
+                        "{$record->name} (\${$record->balance})"
+                        ),
 
-                        // Indicador visual del tipo
-                        Forms\Components\Placeholder::make('type_indicator')
-                            ->label('📊 Tipo de Transacción')
-                            ->content(function (Get $get): string {
-                                if (!$get('category_id')) {
-                                    return '⚪ Selecciona una categoría';
-                                }
+                    Forms\Components\DatePicker::make('date')
+                        ->label('Fecha')
+                        ->required()
+                        ->default(now())
+                        ->native(false)
+                        ->displayFormat('d/m/Y')
+                        ->maxDate(now())
+                        ->columnSpan(1),
 
-                                $category = Category::find($get('category_id'));
+                    Forms\Components\Textarea::make('description')
+                        ->label('Descripción')
+                        ->maxLength(65535)
+                        ->rows(3)
+                        ->columnSpan(3),
 
-                                if (!$category) {
-                                    return '⚪ Categoría no encontrada';
-                                }
-
-                                if ($category->name === 'Transferencia') {
-                                    return '🔄 Esta será una TRANSFERENCIA entre cuentas';
-                                }
-
-                                return $category->type === 'income'
-                                    ? '📈 Esta será un INGRESO'
-                                    : '📉 Esta será un GASTO';
-                            })
-                            ->visible(fn (Get $get): bool => filled($get('category_id'))),
-
-                        // Vista previa de transferencia
-                        Forms\Components\Placeholder::make('transfer_preview')
-                            ->label('📋 Resumen')
-                            ->content(function (Get $get): string {
-                                $fromAccount = $get('account_id') ?
-                                    Account::find($get('account_id'))?->name : 'Seleccionar';
-                                $toAccount = $get('to_account_id') ?
-                                    Account::find($get('to_account_id'))?->name : 'Seleccionar';
-                                $amount = $get('amount') ? '$' . number_format($get('amount'), 2) : '$0.00';
-
-                                return "💸 {$fromAccount} → 💰 {$toAccount} | Monto: {$amount}";
-                            })
-                            ->visible(fn (Get $get): bool =>
-                                $get('is_transfer') && $get('account_id') && $get('to_account_id') && $get('amount')
-                            ),
-
-                        // Descripción opcional
-                        Forms\Components\Textarea::make('description')
-                            ->label('📝 Descripción (Opcional)')
-                            ->maxLength(500)
-                            ->rows(3)
-                            ->placeholder('Detalles adicionales sobre esta transacción...'),
-
-                        // Campo oculto para detectar si es transferencia
-                        Forms\Components\Hidden::make('is_transfer')
-                            ->default(false),
-                    ])
-                    ->columnSpan('full'),
-            ]);
+                    // Campo oculto para detectar transferencias
+                    Forms\Components\Hidden::make('is_transfer')
+                        ->default(false),
+                ]),
+        ]);
     }
 
-    public static function create(): CreateTransaction
+    protected static function getCachedCategories(): array
     {
-        return new CreateTransaction();
+        return Cache::remember('categories_select', 3600, function () {
+            return Category::orderBy('type')
+                ->orderBy('name')
+                ->pluck('name', 'id')
+                ->toArray();
+        });
     }
-
 
     public static function table(Table $table): Table
     {
@@ -240,6 +176,22 @@ class TransactionResource extends Resource
             ->paginated([10, 25, 50]);
     }
 
+
+    protected static function getCachedAccounts(?int $exclude = null): array
+    {
+        $cacheKey = $exclude ? "accounts_select_exclude_{$exclude}" : 'accounts_select';
+
+        return Cache::remember($cacheKey, 3600, function () use ($exclude) {
+            $query = Account::orderBy('name');
+
+            if ($exclude) {
+                $query->where('id', '!=', $exclude);
+            }
+
+            return $query->pluck('name', 'id')->toArray();
+        });
+    }
+
     public static function getRelations(): array
     {
         return [
@@ -247,15 +199,25 @@ class TransactionResource extends Resource
         ];
     }
 
-    public static function getPages(): array
+    protected static function getDynamicPlaceholder(?int $categoryId): string
     {
-        return [
-            'index' => Pages\ListTransactions::route('/'),
-            'create' => Pages\CreateTransaction::route('/create'),
-            'edit' => Pages\EditTransaction::route('/{record}/edit'),
-        ];
-    }
+        if (!$categoryId) {
+            return 'Ej: Compra supermercado';
+        }
 
+        $category = Category::find($categoryId);
+
+        $placeholders = [
+            'Alquiler' => 'Alquiler mensual',
+            'Supermercado' => 'Compra en supermercado',
+            'Restaurante' => 'Cena en restaurante',
+            'Transporte' => 'Viaje en transporte',
+            'Salario' => 'Pago de salario',
+            'Servicios' => 'Pago de servicio',
+        ];
+
+        return $placeholders[$category?->name] ?? "Gasto en {$category?->name}";
+    }
     public static function getHeaderActions(): array
     {
         return [
@@ -317,24 +279,20 @@ class TransactionResource extends Resource
                 ->successNotificationTitle('Transacción creada desde template'),
         ];
     }
-    protected function quickExpenseAction(string $label, int $categoryId, string $icon): Action
+
+    public static function create(): CreateTransaction
     {
-        return Action::make(Str::slug($label))
-            ->label($label)
-            ->icon($icon)
-            ->color('danger')
-            ->form([
-                Forms\Components\TextInput::make('amount')
-                    ->label('Monto')
-                    ->numeric()
-                    ->required(),
-            ])
-            ->action(fn ($data) => Transaction::create([
-                'type' => 'expense',
-                'category_id' => $categoryId,
-                'amount' => $data['amount'],
-                'created_at' => now(),
-            ]));
+        return new CreateTransaction();
     }
 
+    public static function getPages(): array
+    {
+        return [
+            'index' => Pages\ListTransactions::route('/'),
+            'create' => Pages\CreateTransaction::route('/create'),
+            'edit' => Pages\EditTransaction::route('/{record}/edit'),
+        ];
+    }
+
+    // ... resto del código (table, relations, pages)
 }
