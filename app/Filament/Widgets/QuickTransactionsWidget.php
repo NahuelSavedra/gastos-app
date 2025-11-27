@@ -11,23 +11,25 @@ use Illuminate\Support\Facades\View;
 
 class QuickTransactionsWidget extends Widget
 {
-    protected static ?int $sort = 0; // Aparece primero
+    protected static ?int $sort = 0;
     protected static string $view = 'filament.widgets.quick-transactions';
     protected int | string | array $columnSpan = 'full';
 
-    // Propiedades públicas para almacenar los montos de cada template
     public array $amounts = [];
 
     public function getViewData(): array
     {
+        $allTemplates = TransactionTemplate::active()
+            ->with(['category', 'account'])
+            ->orderBy('name')
+            ->get();
+
         return [
-            'templates' => TransactionTemplate::active()
-                ->with(['category', 'account'])
-                ->orderBy('name')
-                ->get()
-                ->groupBy(function ($template) {
-                    return $template->is_recurring ? 'recurring' : 'oneTime';
-                }),
+            'templates' => $allTemplates->groupBy(function ($template) {
+                return $template->is_recurring ? 'recurring' : 'oneTime';
+            }),
+            'pending' => $allTemplates->filter(fn($t) => !$t->isUsedThisMonth()),
+            'paid' => $allTemplates->filter(fn($t) => $t->isUsedThisMonth()),
         ];
     }
 

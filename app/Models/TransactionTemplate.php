@@ -57,6 +57,33 @@ class TransactionTemplate extends Model
         return Transaction::create($data);
     }
 
+    public function isUsedThisMonth(): bool
+    {
+        if (!$this->is_recurring) {
+            return false;
+        }
+
+        return $this->last_generated_at
+            && $this->last_generated_at->month === now()->month
+            && $this->last_generated_at->year === now()->year;
+    }
+
+    public function scopePendingThisMonth($query)
+    {
+        return $query->where(function ($q) {
+            $q->where('is_recurring', false)
+                ->orWhere(function ($sq) {
+                    $sq->where('is_recurring', true)
+                        ->where(function ($ssq) {
+                            $ssq->whereNull('last_generated_at')
+                                ->orWhereRaw('MONTH(last_generated_at) != ?', [now()->month])
+                                ->orWhereRaw('YEAR(last_generated_at) != ?', [now()->year]);
+                        });
+                });
+        });
+    }
+
+
     /**
      * Verificar si debe generarse automáticamente hoy
      */
