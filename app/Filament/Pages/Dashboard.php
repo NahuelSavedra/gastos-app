@@ -2,7 +2,12 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Widgets\AccountsOverviewWidget;
+use App\Filament\Widgets\BalanceOverview;
+use App\Filament\Widgets\ExpenseCategoriesWidget;
 use App\Filament\Widgets\QuickTransactionsWidget;
+use App\Filament\Widgets\QuickTransfers;
+use App\Filament\Widgets\TransactionsTable;
 use Filament\Pages\Page;
 
 class Dashboard extends Page
@@ -15,18 +20,20 @@ class Dashboard extends Page
     {
         return [
             // 🏆 PRIORIDAD 1: Totales generales (lo más importante)
-            \App\Filament\Widgets\BalanceOverview::class,
+            BalanceOverview::class,
 
             // 🏦 PRIORIDAD 2: Resumen de cuentas
-            \App\Filament\Widgets\AccountsOverviewWidget::class,
+            AccountsOverviewWidget::class,
 
             // 📊 PRIORIDAD 3: Gastos por categorías
-            \App\Filament\Widgets\ExpenseCategoriesWidget::class,
+            ExpenseCategoriesWidget::class,
 
             // 📋 PRIORIDAD 4: Transacciones (menos importante, al final)
-            \App\Filament\Widgets\TransactionsTable::class,
+            TransactionsTable::class,
 
             QuickTransactionsWidget::class,
+
+            QuickTransfers::class
         ];
     }
 
