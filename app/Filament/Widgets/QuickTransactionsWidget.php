@@ -4,10 +4,8 @@ namespace App\Filament\Widgets;
 
 use App\Filament\Resources\TransactionResource;
 use App\Models\TransactionTemplate;
-use Filament\Forms;
 use Filament\Notifications\Notification;
 use Filament\Widgets\Widget;
-use Illuminate\Support\Facades\View;
 
 class QuickTransactionsWidget extends Widget
 {
@@ -15,21 +13,20 @@ class QuickTransactionsWidget extends Widget
     protected static string $view = 'filament.widgets.quick-transactions';
     protected int | string | array $columnSpan = 'full';
 
+    // Propiedades públicas
     public array $amounts = [];
+    public array $dates = []; // ✅ NUEVO
 
     public function getViewData(): array
     {
-        $allTemplates = TransactionTemplate::active()
-            ->with(['category', 'account'])
-            ->orderBy('name')
-            ->get();
-
         return [
-            'templates' => $allTemplates->groupBy(function ($template) {
-                return $template->is_recurring ? 'recurring' : 'oneTime';
-            }),
-            'pending' => $allTemplates->filter(fn($t) => !$t->isUsedThisMonth()),
-            'paid' => $allTemplates->filter(fn($t) => $t->isUsedThisMonth()),
+            'templates' => TransactionTemplate::active()
+                ->with(['category', 'account'])
+                ->orderBy('name')
+                ->get()
+                ->groupBy(function ($template) {
+                    return $template->is_recurring ? 'recurring' : 'oneTime';
+                }),
         ];
     }
 
@@ -40,7 +37,6 @@ class QuickTransactionsWidget extends Widget
     {
         $template = TransactionTemplate::findOrFail($templateId);
 
-        // Validar que el template tenga monto fijo
         if (!$template->amount) {
             Notification::make()
                 ->title('Error')
@@ -65,7 +61,6 @@ class QuickTransactionsWidget extends Widget
             ->success()
             ->send();
 
-        // Limpiar montos y refrescar
         $this->amounts = [];
         $this->dispatch('transaction-created');
     }
@@ -77,10 +72,8 @@ class QuickTransactionsWidget extends Widget
     {
         $template = TransactionTemplate::findOrFail($templateId);
 
-        // Obtener el monto del array
         $amount = $this->amounts[$templateId] ?? null;
 
-        // Validación
         if (!$amount || $amount <= 0) {
             Notification::make()
                 ->title('Error')
@@ -90,9 +83,14 @@ class QuickTransactionsWidget extends Widget
             return;
         }
 
+        // ✅ LÓGICA DE FECHA: Recurrentes = hoy, No recurrentes = fecha personalizable
+        $date = $template->is_recurring
+            ? now()
+            : ($this->dates[$templateId] ?? now());
+
         $transaction = $template->createTransaction([
             'amount' => $amount,
-            'date' => now(),
+            'date' => $date,
         ]);
 
         if ($template->is_recurring) {
@@ -101,12 +99,12 @@ class QuickTransactionsWidget extends Widget
 
         Notification::make()
             ->title('✅ Transacción creada')
-            ->body("Se creó: {$transaction->title} - \${$transaction->amount}")
+            ->body("Se creó: {$transaction->title} - \${$transaction->amount} - {$transaction->date->format('d/m/Y')}")
             ->success()
             ->send();
 
-        // Limpiar el monto usado
-        unset($this->amounts[$templateId]);
+        // Limpiar datos
+        unset($this->amounts[$templateId], $this->dates[$templateId]);
         $this->dispatch('transaction-created');
     }
 }
