@@ -3,35 +3,39 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\AccountResource\Pages;
-use App\Filament\Resources\AccountResource\RelationManagers;
 use App\Models\Account;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class AccountResource extends Resource
 {
     protected static ?string $model = Account::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-banknotes';
+
+    protected static ?string $navigationLabel = 'Cuentas';
+
+    protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
                 Forms\Components\TextInput::make('name')
-                    ->label('Nombre de la cuenta')
+                    ->label('🏦 Nombre de la cuenta')
                     ->required()
-                    ->maxLength(100),
+                    ->maxLength(100)
+                    ->placeholder('Ej: Galicia, MercadoPago, Efectivo'),
 
                 Forms\Components\TextInput::make('initial_balance')
-                    ->label('Saldo inicial')
+                    ->label('💰 Saldo inicial')
                     ->numeric()
-                    ->default(0),
+                    ->default(0)
+                    ->prefix('$')
+                    ->helperText('El balance inicial de esta cuenta al momento de crearla'),
             ]);
     }
 
@@ -39,16 +43,57 @@ class AccountResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('name')->label('Cuenta')->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('initial_balance')->label('Saldo inicial')->money('ARS'),
-                Tables\Columns\TextColumn::make('created_at')->dateTime('d/m/Y H:i'),
+                Tables\Columns\TextColumn::make('name')
+                    ->label('🏦 Cuenta')
+                    ->sortable()
+                    ->searchable()
+                    ->weight('bold'),
+
+                Tables\Columns\TextColumn::make('initial_balance')
+                    ->label('💰 Saldo inicial')
+                    ->money('ARS')
+                    ->sortable(),
+
+                Tables\Columns\TextColumn::make('current_balance')
+                    ->label('💳 Balance Actual')
+                    ->getStateUsing(function (Account $record): float {
+                        $income = \App\Models\Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
+                            ->where('transactions.account_id', $record->id)
+                            ->where('categories.type', 'income')
+                            ->sum('transactions.amount');
+
+                        $expense = \App\Models\Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
+                            ->where('transactions.account_id', $record->id)
+                            ->where('categories.type', 'expense')
+                            ->sum('transactions.amount');
+
+                        return $record->initial_balance + $income - $expense;
+                    })
+                    ->money('ARS')
+                    ->color(fn ($state): string => $state >= 0 ? 'success' : 'danger')
+                    ->weight('bold')
+                    ->sortable(),
+
+                Tables\Columns\TextColumn::make('created_at')
+                    ->label('📅 Creada')
+                    ->dateTime('d/m/Y')
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
+            ->defaultSort('name')
             ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\ViewAction::make()
+                    ->label('Ver Detalles')
+                    ->icon('heroicon-o-eye'),
+                Tables\Actions\EditAction::make()
+                    ->label('Editar'),
+                Tables\Actions\DeleteAction::make()
+                    ->label('Eliminar'),
             ])
             ->bulkActions([
-                Tables\Actions\DeleteBulkAction::make(),
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\DeleteBulkAction::make(),
+                ]),
             ]);
     }
 
@@ -64,6 +109,7 @@ class AccountResource extends Resource
         return [
             'index' => Pages\ListAccounts::route('/'),
             'create' => Pages\CreateAccount::route('/create'),
+            'view' => Pages\ViewAccount::route('/{record}'),
             'edit' => Pages\EditAccount::route('/{record}/edit'),
         ];
     }
