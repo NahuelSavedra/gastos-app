@@ -63,12 +63,17 @@ class AccountsOverviewWidget extends Widget
             $accountsData[] = [
                 'id' => $account->id,
                 'name' => $account->name,
+                'type' => $account->account_type ?? 'checking',
+                'type_label' => $account->type_name ?? '🏦 Cuenta',
+                'icon' => $account->account_icon ?? '🏦',
+                'color' => $account->account_color ?? '#3B82F6',
                 'initial_balance' => $account->initial_balance,
                 'current_balance' => $currentBalance,
                 'month_balance' => $monthBalance,
                 'month_income' => $monthIncome,
                 'month_expense' => $monthExpense,
                 'transaction_count' => $transactionCount,
+                'include_in_totals' => $account->include_in_totals ?? true,
             ];
         }
 

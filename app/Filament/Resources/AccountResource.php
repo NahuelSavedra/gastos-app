@@ -24,18 +24,68 @@ class AccountResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\TextInput::make('name')
-                    ->label('🏦 Nombre de la cuenta')
-                    ->required()
-                    ->maxLength(100)
-                    ->placeholder('Ej: Galicia, MercadoPago, Efectivo'),
+                Forms\Components\Section::make('Información Básica')
+                    ->schema([
+                        Forms\Components\TextInput::make('name')
+                            ->label('🏦 Nombre de la cuenta')
+                            ->required()
+                            ->maxLength(100)
+                            ->placeholder('Ej: Galicia, MercadoPago, Efectivo')
+                            ->columnSpan(2),
 
-                Forms\Components\TextInput::make('initial_balance')
-                    ->label('💰 Saldo inicial')
-                    ->numeric()
-                    ->default(0)
-                    ->prefix('$')
-                    ->helperText('El balance inicial de esta cuenta al momento de crearla'),
+                        Forms\Components\Select::make('account_type')
+                            ->label('📋 Tipo de Cuenta')
+                            ->options([
+                                'checking' => '🏦 Cuenta Corriente',
+                                'savings' => '💰 Cuenta de Ahorro',
+                                'cash' => '💵 Efectivo',
+                                'credit_card' => '💳 Tarjeta de Crédito',
+                                'investment' => '📈 Inversión',
+                                'wallet' => '👛 Billetera Digital',
+                            ])
+                            ->required()
+                            ->default('checking')
+                            ->live()
+                            ->helperText('Define el tipo de cuenta para mejor organización'),
+
+                        Forms\Components\Toggle::make('include_in_totals')
+                            ->label('📊 Incluir en totales')
+                            ->helperText('¿Esta cuenta debe incluirse en los cálculos de balance general?')
+                            ->default(true)
+                            ->inline(false),
+                    ])
+                    ->columns(2),
+
+                Forms\Components\Section::make('Balance')
+                    ->schema([
+                        Forms\Components\TextInput::make('initial_balance')
+                            ->label('💰 Saldo inicial')
+                            ->numeric()
+                            ->default(0)
+                            ->prefix('$')
+                            ->helperText('El balance inicial de esta cuenta al momento de crearla'),
+                    ]),
+
+                Forms\Components\Section::make('Personalización (Opcional)')
+                    ->schema([
+                        Forms\Components\TextInput::make('icon')
+                            ->label('🎨 Icono personalizado')
+                            ->placeholder('Ej: 💳, 🏦, 💵')
+                            ->maxLength(10)
+                            ->helperText('Emoji que representa esta cuenta (opcional, se usa el del tipo por defecto)'),
+
+                        Forms\Components\ColorPicker::make('color')
+                            ->label('🎨 Color personalizado')
+                            ->helperText('Color para identificar esta cuenta (opcional)'),
+
+                        Forms\Components\Textarea::make('description')
+                            ->label('📝 Descripción')
+                            ->placeholder('Detalles adicionales sobre esta cuenta...')
+                            ->rows(3)
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(2)
+                    ->collapsible(),
             ]);
     }
 
@@ -44,35 +94,52 @@ class AccountResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('name')
-                    ->label('🏦 Cuenta')
+                    ->label('Cuenta')
+                    ->formatStateUsing(function (Account $record): string {
+                        return $record->account_icon . ' ' . $record->name;
+                    })
                     ->sortable()
                     ->searchable()
                     ->weight('bold'),
 
+                Tables\Columns\BadgeColumn::make('account_type')
+                    ->label('Tipo')
+                    ->formatStateUsing(function (Account $record): string {
+                        return $record->type_name;
+                    })
+                    ->colors([
+                        'primary' => 'checking',
+                        'success' => 'savings',
+                        'warning' => 'cash',
+                        'danger' => 'credit_card',
+                        'info' => 'wallet',
+                        'secondary' => 'investment',
+                    ]),
+
                 Tables\Columns\TextColumn::make('initial_balance')
                     ->label('💰 Saldo inicial')
                     ->money('ARS')
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(),
 
                 Tables\Columns\TextColumn::make('current_balance')
                     ->label('💳 Balance Actual')
                     ->getStateUsing(function (Account $record): float {
-                        $income = \App\Models\Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
-                            ->where('transactions.account_id', $record->id)
-                            ->where('categories.type', 'income')
-                            ->sum('transactions.amount');
-
-                        $expense = \App\Models\Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
-                            ->where('transactions.account_id', $record->id)
-                            ->where('categories.type', 'expense')
-                            ->sum('transactions.amount');
-
-                        return $record->initial_balance + $income - $expense;
+                        return $record->current_balance;
                     })
                     ->money('ARS')
                     ->color(fn ($state): string => $state >= 0 ? 'success' : 'danger')
                     ->weight('bold')
                     ->sortable(),
+
+                Tables\Columns\IconColumn::make('include_in_totals')
+                    ->label('En Totales')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-check-circle')
+                    ->falseIcon('heroicon-o-x-circle')
+                    ->trueColor('success')
+                    ->falseColor('danger')
+                    ->toggleable(),
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('📅 Creada')
@@ -81,6 +148,23 @@ class AccountResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('name')
+            ->filters([
+                Tables\Filters\SelectFilter::make('account_type')
+                    ->label('Tipo de Cuenta')
+                    ->options([
+                        'checking' => '🏦 Cuenta Corriente',
+                        'savings' => '💰 Cuenta de Ahorro',
+                        'cash' => '💵 Efectivo',
+                        'credit_card' => '💳 Tarjeta de Crédito',
+                        'investment' => '📈 Inversión',
+                        'wallet' => '👛 Billetera Digital',
+                    ]),
+                Tables\Filters\TernaryFilter::make('include_in_totals')
+                    ->label('Incluidas en totales')
+                    ->placeholder('Todas')
+                    ->trueLabel('Solo incluidas')
+                    ->falseLabel('Solo excluidas'),
+            ])
             ->actions([
                 Tables\Actions\ViewAction::make()
                     ->label('Ver Detalles')
