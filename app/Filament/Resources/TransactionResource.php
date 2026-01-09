@@ -15,6 +15,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Session;
 
 class TransactionResource extends Resource
 {
@@ -77,6 +78,10 @@ class TransactionResource extends Resource
                         ->searchable()
                         ->required()
                         ->live()
+                        ->default(fn () => Session::get('last_transaction_account_id'))
+                        ->helperText(fn () => Session::has('last_transaction_account_id')
+                            ? 'Cuenta recordada de la transaccion anterior'
+                            : null)
                         ->columnSpan(fn(Forms\Get $get) => $get('is_transfer') ? 1 : 2)
                         // UX: Mostrar balance actual
                         ->getOptionLabelFromRecordUsing(fn(Account $record) =>
@@ -100,8 +105,7 @@ class TransactionResource extends Resource
                         ->label('Fecha')
                         ->required()
                         ->default(now())
-                        ->native(false)
-                        ->displayFormat('d/m/Y')
+                        ->native(true)
                         ->maxDate(now())
                         ->columnSpan(1),
 
@@ -253,6 +257,7 @@ class TransactionResource extends Resource
                     Forms\Components\DatePicker::make('date')
                         ->label('Fecha')
                         ->default(now())
+                        ->native(true)
                         ->required(),
 
                     Forms\Components\Hidden::make('category_id'),

@@ -6,22 +6,90 @@ use App\Filament\Resources\TransactionResource;
 use App\Models\Account;
 use App\Models\Category;
 use App\Models\Transaction;
+use Filament\Actions\Action;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Session;
 
 class CreateTransaction extends CreateRecord
 {
     protected static string $resource = TransactionResource::class;
 
-    // Reducir queries cargando relaciones necesarias
+    // Property to track if we should redirect to create another
+    public bool $createAnother = false;
+
     protected function getRedirectUrl(): string
     {
+        // If creating another, stay on the create page
+        if ($this->createAnother) {
+            return $this->getResource()::getUrl('create');
+        }
         return $this->getResource()::getUrl('index');
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('clearAccountContext')
+                ->label('Limpiar cuenta guardada')
+                ->color('gray')
+                ->icon('heroicon-o-x-circle')
+                ->visible(fn () => Session::has('last_transaction_account_id'))
+                ->action(function () {
+                    Session::forget('last_transaction_account_id');
+                    $this->fillForm();
+                }),
+        ];
+    }
+
+    protected function getFormActions(): array
+    {
+        return [
+            $this->getCreateFormAction(),
+            $this->getCreateAnotherFormAction(),
+            $this->getCancelFormAction(),
+        ];
+    }
+
+    protected function getCreateFormAction(): Action
+    {
+        return Action::make('create')
+            ->label('Crear')
+            ->submit('create')
+            ->keyBindings(['mod+s']);
+    }
+
+    protected function getCreateAnotherFormAction(): Action
+    {
+        return Action::make('createAnother')
+            ->label('Crear y agregar otro')
+            ->action(function () {
+                $this->createAnother = true;
+                $this->create();
+            })
+            ->keyBindings(['mod+shift+s'])
+            ->color('gray');
+    }
+
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        // Restore last used account from session
+        $lastAccountId = Session::get('last_transaction_account_id');
+        if ($lastAccountId && Account::where('id', $lastAccountId)->exists()) {
+            $data['account_id'] = $lastAccountId;
+        }
+
+        return $data;
     }
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
+        // Save the account context to session for consecutive creations
+        if (isset($data['account_id'])) {
+            Session::put('last_transaction_account_id', $data['account_id']);
+        }
+
         // Limpiar campos temporales
         unset($data['is_transfer'], $data['quick_amount']);
 
