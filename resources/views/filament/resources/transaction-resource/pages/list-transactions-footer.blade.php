@@ -1,0 +1,1 @@
+@livewire('batch-transaction-modal')

@@ -177,7 +177,45 @@ class TransactionResource extends Resource
                     ->relationship('account', 'name')
                     ->label('Account'),
             ])
-            ->paginated([10, 25, 50]);
+            ->paginated([10, 25, 50])
+            ->actions([
+                Tables\Actions\EditAction::make(),
+                Tables\Actions\Action::make('duplicate')
+                    ->label('Duplicar')
+                    ->icon('heroicon-o-document-duplicate')
+                    ->color('gray')
+                    ->tooltip('Crear nueva transacción con estos datos')
+                    ->action(function (Transaction $record) {
+                        // Excluir transfers (transacciones con reference_id)
+                        if ($record->reference_id) {
+                            \Filament\Notifications\Notification::make()
+                                ->warning()
+                                ->title('No se puede duplicar')
+                                ->body('Las transferencias no se pueden duplicar directamente.')
+                                ->send();
+                            return;
+                        }
+
+                        // Guardar datos en sesión para pre-llenar el formulario
+                        Session::put('duplicate_transaction_data', [
+                            'account_id' => $record->account_id,
+                            'category_id' => $record->category_id,
+                            'amount' => $record->amount,
+                            'title' => $record->title,
+                            'description' => $record->description,
+                            'date' => now()->format('Y-m-d'),
+                        ]);
+
+                        \Filament\Notifications\Notification::make()
+                            ->success()
+                            ->title('Transacción duplicada')
+                            ->body('Ajusta los datos si es necesario.')
+                            ->send();
+
+                        return redirect(TransactionResource::getUrl('create'));
+                    }),
+                Tables\Actions\DeleteAction::make(),
+            ]);
     }
 
 

@@ -74,7 +74,13 @@ class CreateTransaction extends CreateRecord
 
     protected function mutateFormDataBeforeFill(array $data): array
     {
-        // Restore last used account from session
+        // Prioridad 1: Datos de duplicación de transacción
+        if (Session::has('duplicate_transaction_data')) {
+            $duplicateData = Session::pull('duplicate_transaction_data');
+            return array_merge($data, $duplicateData);
+        }
+
+        // Prioridad 2: Restaurar última cuenta usada
         $lastAccountId = Session::get('last_transaction_account_id');
         if ($lastAccountId && Account::where('id', $lastAccountId)->exists()) {
             $data['account_id'] = $lastAccountId;
