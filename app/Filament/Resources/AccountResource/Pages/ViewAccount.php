@@ -3,10 +3,13 @@
 namespace App\Filament\Resources\AccountResource\Pages;
 
 use App\Filament\Resources\AccountResource;
+use App\Models\Category;
 use App\Models\Transaction;
+use Carbon\Carbon;
 use Filament\Actions;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Url;
 
 class ViewAccount extends ViewRecord
 {
@@ -14,46 +17,81 @@ class ViewAccount extends ViewRecord
 
     protected static string $view = 'filament.resources.account-resource.pages.view-account';
 
+    #[Url]
+    public ?string $month = null;
+
+    public function mount(int|string $record): void
+    {
+        parent::mount($record);
+
+        if (! $this->month) {
+            $this->month = now()->format('Y-m');
+        }
+    }
+
+    public function getSelectedDate(): Carbon
+    {
+        return Carbon::createFromFormat('Y-m', $this->month ?? now()->format('Y-m'));
+    }
+
+    public function getMonthOptions(): array
+    {
+        $months = [];
+        $currentDate = Carbon::now();
+
+        for ($i = 0; $i < 12; $i++) {
+            $date = $currentDate->copy()->subMonths($i);
+            $key = $date->format('Y-m');
+            $label = $date->translatedFormat('F Y');
+            $months[$key] = ucfirst($label);
+        }
+
+        return $months;
+    }
+
+    public function updatedMonth(): void
+    {
+        // Livewire will automatically re-render
+    }
+
     protected function getHeaderActions(): array
     {
         return [
             Actions\EditAction::make()
-                ->label('✏️ Editar Cuenta'),
+                ->label('Editar Cuenta'),
             Actions\Action::make('new_transaction')
-                ->label('➕ Nueva Transacción')
+                ->label('Nueva Transacción')
                 ->icon('heroicon-o-plus-circle')
                 ->color('success')
                 ->url(fn () => route('filament.app.resources.transactions.create', [
-                    'account_id' => $this->record->id
+                    'account_id' => $this->record->id,
                 ])),
         ];
     }
 
-    /**
-     * Obtener datos para la vista
-     */
     public function getViewData(): array
     {
         $account = $this->record;
-        $excludedCategoryIds = [4]; // Excluir Transferencias del cálculo
+        $selectedDate = $this->getSelectedDate();
+        $excludedCategoryIds = Category::where('name', 'Transfer')->pluck('id')->toArray();
 
         return [
             'account' => $account,
+            'selectedMonth' => $this->month,
+            'monthLabel' => ucfirst($selectedDate->translatedFormat('F Y')),
+            'monthOptions' => $this->getMonthOptions(),
             'currentBalance' => $this->getCurrentBalance($account),
-            'monthBalance' => $this->getMonthBalance($account, $excludedCategoryIds),
-            'monthStats' => $this->getMonthStats($account, $excludedCategoryIds),
-            'last7Days' => $this->getLast7DaysData($account, $excludedCategoryIds),
-            'categoryBreakdown' => $this->getCategoryBreakdown($account),
-            'recentTransactions' => $this->getRecentTransactions($account),
+            'monthBalance' => $this->getMonthBalance($account, $excludedCategoryIds, $selectedDate),
+            'monthStats' => $this->getMonthStats($account, $excludedCategoryIds, $selectedDate),
+            'last7Days' => $this->getLast7DaysData($account, $excludedCategoryIds, $selectedDate),
+            'categoryBreakdown' => $this->getCategoryBreakdown($account, $selectedDate),
+            'recentTransactions' => $this->getRecentTransactions($account, $selectedDate),
             'monthlyTrend' => $this->getMonthlyTrend($account, $excludedCategoryIds),
-            'topCategories' => $this->getTopCategories($account),
-            'transfersSummary' => $this->getTransfersSummary($account),
+            'topCategories' => $this->getTopCategories($account, $selectedDate),
+            'transfersSummary' => $this->getTransfersSummary($account, $selectedDate),
         ];
     }
 
-    /**
-     * Balance actual de la cuenta (suma de todas las transacciones)
-     */
     private function getCurrentBalance($account): float
     {
         $income = Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
@@ -69,53 +107,46 @@ class ViewAccount extends ViewRecord
         return $account->initial_balance + $income - $expense;
     }
 
-    /**
-     * Balance del mes actual (excluyendo transferencias)
-     */
-    private function getMonthBalance($account, array $excludedCategories): float
+    private function getMonthBalance($account, array $excludedCategories, Carbon $date): float
     {
         $income = Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('transactions.account_id', $account->id)
             ->where('categories.type', 'income')
             ->whereNotIn('transactions.category_id', $excludedCategories)
-            ->whereMonth('transactions.date', now()->month)
-            ->whereYear('transactions.date', now()->year)
+            ->whereMonth('transactions.date', $date->month)
+            ->whereYear('transactions.date', $date->year)
             ->sum('transactions.amount');
 
         $expense = Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('transactions.account_id', $account->id)
             ->where('categories.type', 'expense')
             ->whereNotIn('transactions.category_id', $excludedCategories)
-            ->whereMonth('transactions.date', now()->month)
-            ->whereYear('transactions.date', now()->year)
+            ->whereMonth('transactions.date', $date->month)
+            ->whereYear('transactions.date', $date->year)
             ->sum('transactions.amount');
 
         return $income - $expense;
     }
 
-    /**
-     * Estadísticas del mes actual
-     */
-    private function getMonthStats($account, array $excludedCategories): array
+    private function getMonthStats($account, array $excludedCategories, Carbon $selectedDate): array
     {
-        $currentMonth = now();
-        $previousMonth = now()->subMonth();
+        $previousDate = $selectedDate->copy()->subMonth();
 
-        // Mes actual
+        // Mes seleccionado
         $currentIncome = Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('transactions.account_id', $account->id)
             ->where('categories.type', 'income')
             ->whereNotIn('transactions.category_id', $excludedCategories)
-            ->whereMonth('transactions.date', $currentMonth->month)
-            ->whereYear('transactions.date', $currentMonth->year)
+            ->whereMonth('transactions.date', $selectedDate->month)
+            ->whereYear('transactions.date', $selectedDate->year)
             ->sum('transactions.amount');
 
         $currentExpense = Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('transactions.account_id', $account->id)
             ->where('categories.type', 'expense')
             ->whereNotIn('transactions.category_id', $excludedCategories)
-            ->whereMonth('transactions.date', $currentMonth->month)
-            ->whereYear('transactions.date', $currentMonth->year)
+            ->whereMonth('transactions.date', $selectedDate->month)
+            ->whereYear('transactions.date', $selectedDate->year)
             ->sum('transactions.amount');
 
         // Mes anterior
@@ -123,19 +154,18 @@ class ViewAccount extends ViewRecord
             ->where('transactions.account_id', $account->id)
             ->where('categories.type', 'income')
             ->whereNotIn('transactions.category_id', $excludedCategories)
-            ->whereMonth('transactions.date', $previousMonth->month)
-            ->whereYear('transactions.date', $previousMonth->year)
+            ->whereMonth('transactions.date', $previousDate->month)
+            ->whereYear('transactions.date', $previousDate->year)
             ->sum('transactions.amount');
 
         $previousExpense = Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('transactions.account_id', $account->id)
             ->where('categories.type', 'expense')
             ->whereNotIn('transactions.category_id', $excludedCategories)
-            ->whereMonth('transactions.date', $previousMonth->month)
-            ->whereYear('transactions.date', $previousMonth->year)
+            ->whereMonth('transactions.date', $previousDate->month)
+            ->whereYear('transactions.date', $previousDate->year)
             ->sum('transactions.amount');
 
-        // Calcular variaciones
         $incomeChange = $previousIncome > 0
             ? (($currentIncome - $previousIncome) / $previousIncome) * 100
             : 0;
@@ -144,10 +174,9 @@ class ViewAccount extends ViewRecord
             ? (($currentExpense - $previousExpense) / $previousExpense) * 100
             : 0;
 
-        // Cantidad de transacciones
         $transactionCount = Transaction::where('account_id', $account->id)
-            ->whereMonth('date', $currentMonth->month)
-            ->whereYear('date', $currentMonth->year)
+            ->whereMonth('date', $selectedDate->month)
+            ->whereYear('date', $selectedDate->year)
             ->count();
 
         return [
@@ -159,15 +188,19 @@ class ViewAccount extends ViewRecord
         ];
     }
 
-    /**
-     * Evolución de últimos 7 días
-     */
-    private function getLast7DaysData($account, array $excludedCategories): array
+    private function getLast7DaysData($account, array $excludedCategories, Carbon $selectedDate): array
     {
         $data = [];
+        $endOfMonth = $selectedDate->copy()->endOfMonth();
 
-        for ($i = 6; $i >= 0; $i--) {
-            $date = now()->subDays($i);
+        if ($selectedDate->isSameMonth(now())) {
+            $endOfMonth = now();
+        }
+
+        $days = min(7, $endOfMonth->day);
+
+        for ($i = $days - 1; $i >= 0; $i--) {
+            $date = $endOfMonth->copy()->subDays($i);
 
             $income = Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
                 ->where('transactions.account_id', $account->id)
@@ -185,7 +218,7 @@ class ViewAccount extends ViewRecord
 
             $data[] = [
                 'date' => $date->format('d/m'),
-                'day' => $date->format('D'),
+                'day' => $date->translatedFormat('D'),
                 'income' => $income,
                 'expense' => $expense,
                 'balance' => $income - $expense,
@@ -195,17 +228,15 @@ class ViewAccount extends ViewRecord
         return $data;
     }
 
-    /**
-     * Desglose por categorías (mes actual)
-     */
-    private function getCategoryBreakdown($account): array
+    private function getCategoryBreakdown($account, Carbon $selectedDate): array
     {
         $expenses = Transaction::select('categories.name', 'categories.type', DB::raw('SUM(transactions.amount) as total'))
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('transactions.account_id', $account->id)
             ->where('categories.type', 'expense')
-            ->whereMonth('transactions.date', now()->month)
-            ->whereYear('transactions.date', now()->year)
+            ->where('categories.name', '!=', 'Transfer')
+            ->whereMonth('transactions.date', $selectedDate->month)
+            ->whereYear('transactions.date', $selectedDate->year)
             ->groupBy('categories.id', 'categories.name', 'categories.type')
             ->orderByDesc('total')
             ->get();
@@ -214,8 +245,9 @@ class ViewAccount extends ViewRecord
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('transactions.account_id', $account->id)
             ->where('categories.type', 'income')
-            ->whereMonth('transactions.date', now()->month)
-            ->whereYear('transactions.date', now()->year)
+            ->where('categories.name', '!=', 'Transfer')
+            ->whereMonth('transactions.date', $selectedDate->month)
+            ->whereYear('transactions.date', $selectedDate->year)
             ->groupBy('categories.id', 'categories.name', 'categories.type')
             ->orderByDesc('total')
             ->get();
@@ -241,22 +273,18 @@ class ViewAccount extends ViewRecord
         ];
     }
 
-    /**
-     * Transacciones recientes (últimas 15)
-     */
-    private function getRecentTransactions($account)
+    private function getRecentTransactions($account, Carbon $selectedDate)
     {
         return Transaction::with(['category', 'account'])
             ->where('account_id', $account->id)
+            ->whereMonth('date', $selectedDate->month)
+            ->whereYear('date', $selectedDate->year)
             ->latest('date')
             ->latest('created_at')
-            ->take(15)
+            ->take(20)
             ->get();
     }
 
-    /**
-     * Tendencia mensual (últimos 6 meses)
-     */
     private function getMonthlyTrend($account, array $excludedCategories): array
     {
         $data = [];
@@ -281,7 +309,7 @@ class ViewAccount extends ViewRecord
                 ->sum('transactions.amount');
 
             $data[] = [
-                'month' => $date->format('M Y'),
+                'month' => ucfirst($date->translatedFormat('M Y')),
                 'income' => $income,
                 'expense' => $expense,
                 'balance' => $income - $expense,
@@ -291,85 +319,73 @@ class ViewAccount extends ViewRecord
         return $data;
     }
 
-    /**
-     * Top 5 categorías de gasto
-     */
-    private function getTopCategories($account): array
+    private function getTopCategories($account, Carbon $selectedDate): array
     {
         return Transaction::select('categories.name', DB::raw('SUM(transactions.amount) as total'), DB::raw('COUNT(*) as count'))
             ->join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('transactions.account_id', $account->id)
             ->where('categories.type', 'expense')
-            ->whereMonth('transactions.date', now()->month)
-            ->whereYear('transactions.date', now()->year)
+            ->where('categories.name', '!=', 'Transfer')
+            ->whereMonth('transactions.date', $selectedDate->month)
+            ->whereYear('transactions.date', $selectedDate->year)
             ->groupBy('categories.id', 'categories.name')
             ->orderByDesc('total')
             ->take(5)
             ->get()
-            ->map(function ($item) {
-                return [
-                    'name' => $item->name,
-                    'amount' => $item->total,
-                    'count' => $item->count,
-                ];
-            })
+            ->map(fn ($item) => [
+                'name' => $item->name,
+                'amount' => $item->total,
+                'count' => $item->count,
+            ])
             ->toArray();
     }
 
-    /**
-     * Resumen de transferencias (entrantes y salientes)
-     */
-    private function getTransfersSummary($account): array
+    private function getTransfersSummary($account, Carbon $selectedDate): array
     {
-        $transferCategory = \App\Models\Category::where('name', 'Transferencia')->first();
+        $transferCategory = Category::where('name', 'Transfer')->first();
 
-        if (!$transferCategory) {
+        if (! $transferCategory) {
             return [
                 'incoming' => 0,
                 'outgoing' => 0,
                 'count_incoming' => 0,
                 'count_outgoing' => 0,
+                'net' => 0,
             ];
         }
 
-        $incoming = Transaction::where('account_id', $account->id)
-            ->where('category_id', $transferCategory->id)
-            ->whereMonth('date', now()->month)
-            ->whereYear('date', now()->year)
-            ->where(function ($query) {
-                $query->whereHas('category', function ($q) {
-                    $q->where('type', 'income');
-                });
-            })
-            ->sum('amount');
+        // Transferencias recibidas (income)
+        $incoming = Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
+            ->where('transactions.account_id', $account->id)
+            ->where('transactions.category_id', $transferCategory->id)
+            ->where('categories.type', 'income')
+            ->whereMonth('transactions.date', $selectedDate->month)
+            ->whereYear('transactions.date', $selectedDate->year)
+            ->sum('transactions.amount');
 
-        $outgoing = Transaction::where('account_id', $account->id)
-            ->where('category_id', $transferCategory->id)
-            ->whereMonth('date', now()->month)
-            ->whereYear('date', now()->year)
-            ->where(function ($query) {
-                $query->whereHas('category', function ($q) {
-                    $q->where('type', 'expense');
-                });
-            })
-            ->sum('amount');
-
-        $countIncoming = Transaction::where('account_id', $account->id)
-            ->where('category_id', $transferCategory->id)
-            ->whereMonth('date', now()->month)
-            ->whereYear('date', now()->year)
-            ->whereHas('category', function ($q) {
-                $q->where('type', 'income');
-            })
+        $countIncoming = Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
+            ->where('transactions.account_id', $account->id)
+            ->where('transactions.category_id', $transferCategory->id)
+            ->where('categories.type', 'income')
+            ->whereMonth('transactions.date', $selectedDate->month)
+            ->whereYear('transactions.date', $selectedDate->year)
             ->count();
 
-        $countOutgoing = Transaction::where('account_id', $account->id)
-            ->where('category_id', $transferCategory->id)
-            ->whereMonth('date', now()->month)
-            ->whereYear('date', now()->year)
-            ->whereHas('category', function ($q) {
-                $q->where('type', 'expense');
-            })
+        // Transferencias enviadas (expense)
+        $outgoing = Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
+            ->where('transactions.account_id', $account->id)
+            ->where('transactions.category_id', $transferCategory->id)
+            ->where('categories.type', 'expense')
+            ->whereMonth('transactions.date', $selectedDate->month)
+            ->whereYear('transactions.date', $selectedDate->year)
+            ->sum('transactions.amount');
+
+        $countOutgoing = Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
+            ->where('transactions.account_id', $account->id)
+            ->where('transactions.category_id', $transferCategory->id)
+            ->where('categories.type', 'expense')
+            ->whereMonth('transactions.date', $selectedDate->month)
+            ->whereYear('transactions.date', $selectedDate->year)
             ->count();
 
         return [

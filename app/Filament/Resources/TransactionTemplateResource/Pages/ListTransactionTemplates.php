@@ -3,8 +3,8 @@
 namespace App\Filament\Resources\TransactionTemplateResource\Pages;
 
 use App\Filament\Resources\TransactionTemplateResource;
-use Filament\Resources\Pages\ListRecords;
 use Filament\Actions;
+use Filament\Resources\Pages\ListRecords;
 
 class ListTransactionTemplates extends ListRecords
 {

@@ -9,7 +9,7 @@ Gastos App is a personal expense tracking application built with Laravel 12 and 
 ## Common Commands
 
 ```bash
-# Start full development stack (PHP server, queue listener, logs, Vite)
+# Start full development stack (PHP server, queue listener, logs, Vite1)
 composer run dev
 
 # Run tests

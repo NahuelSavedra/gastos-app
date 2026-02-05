@@ -59,7 +59,7 @@ class TransactionTemplate extends Model
 
     public function isUsedThisMonth(): bool
     {
-        if (!$this->is_recurring) {
+        if (! $this->is_recurring) {
             return false;
         }
 
@@ -76,20 +76,21 @@ class TransactionTemplate extends Model
                     $sq->where('is_recurring', true)
                         ->where(function ($ssq) {
                             $ssq->whereNull('last_generated_at')
-                                ->orWhereRaw('MONTH(last_generated_at) != ?', [now()->month])
-                                ->orWhereRaw('YEAR(last_generated_at) != ?', [now()->year]);
+                                ->orWhere(function ($dateCheck) {
+                                    $dateCheck->whereMonth('last_generated_at', '!=', now()->month)
+                                        ->orWhereYear('last_generated_at', '!=', now()->year);
+                                });
                         });
                 });
         });
     }
-
 
     /**
      * Verificar si debe generarse automáticamente hoy
      */
     public function shouldGenerateToday(): bool
     {
-        if (!$this->is_recurring || !$this->auto_create || !$this->is_active) {
+        if (! $this->is_recurring || ! $this->auto_create || ! $this->is_active) {
             return false;
         }
 
@@ -99,7 +100,7 @@ class TransactionTemplate extends Model
         }
 
         // Verificar según el tipo de recurrencia
-        return match($this->recurrence_type) {
+        return match ($this->recurrence_type) {
             'monthly' => now()->day == $this->recurrence_day,
             'weekly' => now()->dayOfWeek == $this->recurrence_day,
             'yearly' => now()->format('m-d') == $this->recurrence_day,

@@ -5,7 +5,6 @@ namespace App\Providers\Filament;
 use Filament\Facades\Filament;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
-use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Pages;
 use Filament\Panel;
@@ -24,7 +23,7 @@ class AdminPanelProvider extends PanelProvider
     public function panel(Panel $panel): Panel
     {
         Filament::serving(function () {
-            Filament::registerRenderHook('head.end', fn() => '<link rel="stylesheet" href="/css/admin.css">');
+            Filament::registerRenderHook('head.end', fn () => '<link rel="stylesheet" href="/css/admin.css">');
         });
 
         return $panel
@@ -42,8 +41,8 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
-//                Widgets\AccountWidget::class,
-//                Widgets\FilamentInfoWidget::class,
+                //                Widgets\AccountWidget::class,
+                //                Widgets\FilamentInfoWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,
@@ -59,5 +58,4 @@ class AdminPanelProvider extends PanelProvider
                 Authenticate::class,
             ]);
     }
-
 }

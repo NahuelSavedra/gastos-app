@@ -8,19 +8,23 @@ use App\Models\Category;
 use App\Models\TransactionTemplate;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Filament\Forms\Get;
 
 class TransactionTemplateResource extends Resource
 {
     protected static ?string $model = TransactionTemplate::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-document-duplicate';
+
     protected static ?string $navigationGroup = 'Finanzas';
+
     protected static ?string $navigationLabel = 'Templates';
+
     protected static ?string $modelLabel = 'Template';
+
     protected static ?string $pluralModelLabel = 'Templates';
 
     public static function form(Form $form): Form
@@ -64,6 +68,7 @@ class TransactionTemplateResource extends Resource
                                             ->get()
                                             ->mapWithKeys(function ($category) {
                                                 $icon = $category->type === 'income' ? '📈' : '📉';
+
                                                 return [$category->id => "{$icon} {$category->name}"];
                                             });
                                     })
@@ -108,13 +113,13 @@ class TransactionTemplateResource extends Resource
                                     ->live(),
 
                                 Forms\Components\Select::make('recurrence_day')
-                                    ->label(fn (Get $get) => match($get('recurrence_type')) {
+                                    ->label(fn (Get $get) => match ($get('recurrence_type')) {
                                         'monthly' => '📆 Día del Mes',
                                         'weekly' => '📆 Día de la Semana',
                                         'yearly' => '📆 Fecha (MM-DD)',
                                         default => '📆 Día',
                                     })
-                                    ->options(fn (Get $get) => match($get('recurrence_type')) {
+                                    ->options(fn (Get $get) => match ($get('recurrence_type')) {
                                         'monthly' => collect(range(1, 31))->mapWithKeys(fn ($d) => [$d => "Día $d"]),
                                         'weekly' => [
                                             1 => 'Lunes',
@@ -127,8 +132,10 @@ class TransactionTemplateResource extends Resource
                                         ],
                                         'yearly' => collect(range(1, 12))->flatMap(function ($month) {
                                             $days = cal_days_in_month(CAL_GREGORIAN, $month, date('Y'));
+
                                             return collect(range(1, $days))->mapWithKeys(function ($day) use ($month) {
                                                 $date = sprintf('%02d-%02d', $month, $day);
+
                                                 return [$date => date('j \d\e F', mktime(0, 0, 0, $month, $day))];
                                             });
                                         }),
@@ -147,7 +154,7 @@ class TransactionTemplateResource extends Resource
                         Forms\Components\Placeholder::make('recurrence_preview')
                             ->label('📋 Resumen de Recurrencia')
                             ->content(function (Get $get): string {
-                                if (!$get('is_recurring')) {
+                                if (! $get('is_recurring')) {
                                     return '⚪ No es recurrente';
                                 }
 
@@ -155,10 +162,10 @@ class TransactionTemplateResource extends Resource
                                 $day = $get('recurrence_day');
                                 $auto = $get('auto_create') ? 'Se creará automáticamente' : 'Deberás crearla manualmente';
 
-                                $schedule = match($type) {
+                                $schedule = match ($type) {
                                     'monthly' => "Cada día $day del mes",
-                                    'weekly' => "Cada " . ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'][$day ?? 0],
-                                    'yearly' => "Cada año el " . ($day ? date('j \d\e F', strtotime("2024-$day")) : ''),
+                                    'weekly' => 'Cada '.['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'][$day ?? 0],
+                                    'yearly' => 'Cada año el '.($day ? date('j \d\e F', strtotime("2024-$day")) : ''),
                                     default => 'Sin configurar',
                                 };
 
@@ -213,9 +220,11 @@ class TransactionTemplateResource extends Resource
                 Tables\Columns\TextColumn::make('recurrence_info')
                     ->label('Frecuencia')
                     ->getStateUsing(function ($record): string {
-                        if (!$record->is_recurring) return '-';
+                        if (! $record->is_recurring) {
+                            return '-';
+                        }
 
-                        return match($record->recurrence_type) {
+                        return match ($record->recurrence_type) {
                             'monthly' => "Día {$record->recurrence_day}",
                             'weekly' => ['', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'][$record->recurrence_day] ?? '-',
                             'yearly' => date('d/m', strtotime("2024-{$record->recurrence_day}")),

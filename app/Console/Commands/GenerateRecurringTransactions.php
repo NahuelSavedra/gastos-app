@@ -8,6 +8,7 @@ use Illuminate\Console\Command;
 class GenerateRecurringTransactions extends Command
 {
     protected $signature = 'transactions:generate-recurring';
+
     protected $description = 'Genera automáticamente las transacciones recurrentes del día';
 
     public function handle(): int

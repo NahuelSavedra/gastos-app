@@ -6,6 +6,8 @@ use App\Models\Account;
 use App\Models\Category;
 use App\Observers\AccountObserver;
 use App\Observers\CategoryObserver;
+use App\Services\Import\CategoryMatcher\CategoryMatcherService;
+use App\Services\Import\TransactionImportService;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -15,7 +17,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(CategoryMatcherService::class);
+        $this->app->singleton(TransactionImportService::class);
     }
 
     /**

@@ -5,7 +5,7 @@
         </x-slot>
 
         <x-slot name="description">
-            Vista general del balance de todas tus cuentas
+            Movimientos de {{ $this->getViewData()['monthLabel'] }}
         </x-slot>
 
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -55,7 +55,7 @@
                         <div class="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 space-y-2">
                             <div class="flex items-center justify-between">
                                 <span class="text-sm font-medium text-gray-600 dark:text-gray-300">
-                                    Balance del Mes
+                                    Balance del Período
                                 </span>
                                 <span class="text-lg font-bold {{ $account['month_balance'] >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' }}">
                                     {{ $account['month_balance'] >= 0 ? '+' : '' }}${{ number_format($account['month_balance'], 2) }}
@@ -84,12 +84,12 @@
                         </div>
 
                         {{-- Estadísticas Adicionales --}}
-                        <div class="grid grid-cols-2 gap-2 text-xs">
-                            <div class="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
+                        <div class="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
+                            <div class="flex items-center gap-1.5">
                                 <span class="text-base">💳</span>
-                                <span>{{ $account['transaction_count'] }} transacc.</span>
+                                <span>{{ $account['transaction_count'] }} transacciones</span>
                             </div>
-                            <div class="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
+                            <div class="flex items-center gap-1.5">
                                 <span class="text-base">🏦</span>
                                 <span>${{ number_format($account['initial_balance'], 0) }} inicial</span>
                             </div>
@@ -101,7 +101,7 @@
                         <a href="{{ route('filament.app.resources.accounts.view', ['record' => $account['id']]) }}"
                            class="block w-full text-center px-4 py-2.5 rounded-lg font-semibold text-sm transition-all duration-200 hover:shadow-md"
                            style="background-color: {{ $account['color'] ?? '#3B82F6' }}; color: white;">
-                            👁️ Ver Detalles Completos
+                            👁️ Ver Detalles
                         </a>
                     </div>
                 </div>

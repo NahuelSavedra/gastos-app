@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Services;
 
 use App\Models\Account;
@@ -22,16 +23,16 @@ class TransferService
             // Verificar saldo suficiente si tienes columna balance
             if (isset($fromAccount->balance) && $fromAccount->balance < $amount) {
                 throw ValidationException::withMessages([
-                    'amount' => ['Saldo insuficiente en la cuenta origen.']
+                    'amount' => ['Saldo insuficiente en la cuenta origen.'],
                 ]);
             }
 
             // Crear o encontrar categoría de transferencia
             $transferCategory = Category::firstOrCreate([
-                'name' => 'Transfer'
+                'name' => 'Transfer',
             ], [
                 'color' => '#6B7280',
-                'icon' => '🔄'
+                'icon' => '🔄',
             ]);
 
             // Crear transacciones gemelas
@@ -67,7 +68,7 @@ class TransferService
                 'from_account' => $fromAccount->name,
                 'to_account' => $toAccount->name,
                 'amount' => $amount,
-                'transactions' => [$expenseTransaction, $incomeTransaction]
+                'transactions' => [$expenseTransaction, $incomeTransaction],
             ];
         });
     }
@@ -79,26 +80,26 @@ class TransferService
     {
         if ($data['from_account_id'] === $data['to_account_id']) {
             throw ValidationException::withMessages([
-                'to_account_id' => ['La cuenta origen y destino no pueden ser iguales.']
+                'to_account_id' => ['La cuenta origen y destino no pueden ser iguales.'],
             ]);
         }
 
         if ($data['amount'] <= 0) {
             throw ValidationException::withMessages([
-                'amount' => ['El monto debe ser mayor a cero.']
+                'amount' => ['El monto debe ser mayor a cero.'],
             ]);
         }
 
         // Verificar que las cuentas existen
-        if (!Account::where('id', $data['from_account_id'])->exists()) {
+        if (! Account::where('id', $data['from_account_id'])->exists()) {
             throw ValidationException::withMessages([
-                'from_account_id' => ['La cuenta origen no existe.']
+                'from_account_id' => ['La cuenta origen no existe.'],
             ]);
         }
 
-        if (!Account::where('id', $data['to_account_id'])->exists()) {
+        if (! Account::where('id', $data['to_account_id'])->exists()) {
             throw ValidationException::withMessages([
-                'to_account_id' => ['La cuenta destino no existe.']
+                'to_account_id' => ['La cuenta destino no existe.'],
             ]);
         }
     }
@@ -108,7 +109,7 @@ class TransferService
      */
     public function getRelatedTransfers(Transaction $transaction): array
     {
-        if (!$transaction->reference_id) {
+        if (! $transaction->reference_id) {
             return [];
         }
 
@@ -119,4 +120,3 @@ class TransferService
             ->toArray();
     }
 }
-

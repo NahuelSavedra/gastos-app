@@ -5,22 +5,53 @@ namespace App\Filament\Pages;
 use App\Filament\Widgets\AccountsOverviewWidget;
 use App\Filament\Widgets\BalanceOverview;
 use App\Filament\Widgets\ExpenseCategoriesWidget;
-use App\Filament\Widgets\QuickTransactionsWidget;
-use App\Filament\Widgets\QuickTransfers;
 use App\Filament\Widgets\TransactionsTable;
-use Filament\Pages\Page;
+use Carbon\Carbon;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Form;
+use Filament\Pages\Dashboard as BaseDashboard;
+use Filament\Pages\Dashboard\Concerns\HasFiltersForm;
 
-class Dashboard extends Page
+class Dashboard extends BaseDashboard
 {
-    protected static ?string $navigationIcon = 'heroicon-o-document-text';
+    use HasFiltersForm;
 
-    protected static string $view = 'filament.pages.dashboard';
+    protected static ?string $navigationIcon = 'heroicon-o-home';
+
+    protected static ?string $title = 'Dashboard';
+
+    public function filtersForm(Form $form): Form
+    {
+        $months = [];
+        $currentDate = Carbon::now();
+
+        // Generar últimos 12 meses
+        for ($i = 0; $i < 12; $i++) {
+            $date = $currentDate->copy()->subMonths($i);
+            $key = $date->format('Y-m');
+            $label = $date->translatedFormat('F Y');
+            $months[$key] = ucfirst($label);
+        }
+
+        return $form
+            ->schema([
+                Select::make('month')
+                    ->label('Período')
+                    ->options($months)
+                    ->default($currentDate->format('Y-m'))
+                    ->selectablePlaceholder(false)
+                    ->native(false),
+            ]);
+    }
 
     public function getWidgets(): array
     {
         return [
-            // 🏆 PRIORIDAD 1: Totales generales (lo más importante)
+            // 🏆 PRIORIDAD 1: Totales generales
             BalanceOverview::class,
+
+            // 🔮 PRIORIDAD 1.5: Balance proyectado con gastos pendientes
+            \App\Filament\Widgets\ProjectedBalanceWidget::class,
 
             // 🏦 PRIORIDAD 2: Resumen de cuentas
             AccountsOverviewWidget::class,
@@ -28,25 +59,21 @@ class Dashboard extends Page
             // 📊 PRIORIDAD 3: Gastos por categorías
             ExpenseCategoriesWidget::class,
 
-            // 📋 PRIORIDAD 4: Transacciones (menos importante, al final)
+            // 📋 PRIORIDAD 4: Transacciones recientes
             TransactionsTable::class,
 
-            QuickTransactionsWidget::class,
-
-            QuickTransfers::class
+            // 📊 PRIORIDAD 5: Promedios por categoría
+            \App\Filament\Widgets\CategoryAveragesWidget::class,
         ];
     }
 
-    /**
-     * Configuración de columnas responsive
-     */
-    public function getColumns(): int | string | array
+    public function getColumns(): int|string|array
     {
         return [
-            'sm' => 1,  // Móvil: 1 columna
-            'md' => 2,  // Tablet: 2 columnas
-            'lg' => 2,  // Desktop: 2 columnas
-            'xl' => 2,  // Pantalla grande: 2 columnas
+            'sm' => 1,
+            'md' => 2,
+            'lg' => 2,
+            'xl' => 2,
         ];
     }
 }

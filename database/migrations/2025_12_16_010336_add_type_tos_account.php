@@ -19,9 +19,9 @@ return new class extends Migration
             $table->boolean('include_in_totals')->default(true)->after('description');
 
             // Renombrar balance a initial_balance si todavía se llama balance
-            if (Schema::hasColumn('accounts', 'balance') && !Schema::hasColumn('accounts', 'initial_balance')) {
+            if (Schema::hasColumn('accounts', 'balance') && ! Schema::hasColumn('accounts', 'initial_balance')) {
                 $table->renameColumn('balance', 'initial_balance');
-            } elseif (!Schema::hasColumn('accounts', 'initial_balance')) {
+            } elseif (! Schema::hasColumn('accounts', 'initial_balance')) {
                 $table->decimal('initial_balance', 15, 2)->default(0)->after('include_in_totals');
             }
         });
@@ -38,7 +38,7 @@ return new class extends Migration
                 'color',
                 'icon',
                 'description',
-                'include_in_totals'
+                'include_in_totals',
             ]);
         });
     }

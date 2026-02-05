@@ -14,9 +14,13 @@ use Filament\Tables\Table;
 class TransferTemplateResource extends Resource
 {
     protected static ?string $model = TransferTemplate::class;
+
     protected static ?string $navigationIcon = 'heroicon-o-arrow-path';
+
     protected static ?string $navigationLabel = 'Templates de Transferencia';
+
     protected static ?string $navigationGroup = 'Configuración';
+
     protected static ?int $navigationSort = 3;
 
     public static function form(Form $form): Form
@@ -44,7 +48,7 @@ class TransferTemplateResource extends Resource
                                     if ($state && $get('to_account_id')) {
                                         $from = Account::find($state);
                                         $to = Account::find($get('to_account_id'));
-                                        if ($from && $to && !$get('name')) {
+                                        if ($from && $to && ! $get('name')) {
                                             $set('name', "{$from->name} → {$to->name}");
                                         }
                                     }
@@ -61,7 +65,7 @@ class TransferTemplateResource extends Resource
                                     if ($state && $get('from_account_id')) {
                                         $from = Account::find($get('from_account_id'));
                                         $to = Account::find($state);
-                                        if ($from && $to && !$get('name')) {
+                                        if ($from && $to && ! $get('name')) {
                                             $set('name', "{$from->name} → {$to->name}");
                                         }
                                     }

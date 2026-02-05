@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Casts\Attribute;
 
 class Transaction extends Model
 {
@@ -81,7 +81,7 @@ class Transaction extends Model
 
     public function relatedTransfer()
     {
-        if (!$this->reference_id) {
+        if (! $this->reference_id) {
             return null;
         }
 

@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Cache;
 class ClearTransactionCache extends Command
 {
     protected $signature = 'transactions:clear-cache';
+
     protected $description = 'Limpia el cache de categorías y cuentas';
 
     public function handle()

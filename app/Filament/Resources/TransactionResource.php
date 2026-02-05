@@ -20,7 +20,9 @@ use Illuminate\Support\Facades\Session;
 class TransactionResource extends Resource
 {
     protected static ?string $model = Transaction::class;
+
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
+
     protected static ?string $navigationLabel = 'Transacciones';
 
     public static function form(Form $form): Form
@@ -32,12 +34,12 @@ class TransactionResource extends Resource
                     Forms\Components\Group::make([
                         Forms\Components\Placeholder::make('quick_amounts')
                             ->label('Montos Rápidos')
-                            ->content(fn() => view('filament.forms.quick-amounts')),
+                            ->content(fn () => view('filament.forms.quick-amounts')),
                     ])->columnSpan(3),
 
                     Forms\Components\Select::make('category_id')
                         ->label('Categoría')
-                        ->options(fn() => self::getCachedCategories())
+                        ->options(fn () => self::getCachedCategories())
                         ->searchable()
                         ->required()
                         ->live()
@@ -57,7 +59,7 @@ class TransactionResource extends Resource
                         ->minValue(0.01)
                         ->live(debounce: 300)
                         // UX: Autoformateo mientras escribes
-                        ->formatStateUsing(fn($state) => $state ? number_format($state, 2, '.', '') : null)
+                        ->formatStateUsing(fn ($state) => $state ? number_format($state, 2, '.', '') : null)
                         ->extraInputAttributes([
                             'class' => 'text-right text-lg font-semibold',
                         ])
@@ -68,13 +70,12 @@ class TransactionResource extends Resource
                         ->maxLength(255)
                         ->columnSpan(3)
                         // UX: Placeholder dinámico según categoría
-                        ->placeholder(fn(Forms\Get $get) =>
-                        self::getDynamicPlaceholder($get('category_id'))
+                        ->placeholder(fn (Forms\Get $get) => self::getDynamicPlaceholder($get('category_id'))
                         ),
 
                     Forms\Components\Select::make('account_id')
                         ->label('Cuenta Origen')
-                        ->options(fn() => self::getCachedAccounts())
+                        ->options(fn () => self::getCachedAccounts())
                         ->searchable()
                         ->required()
                         ->live()
@@ -82,23 +83,21 @@ class TransactionResource extends Resource
                         ->helperText(fn () => Session::has('last_transaction_account_id')
                             ? 'Cuenta recordada de la transaccion anterior'
                             : null)
-                        ->columnSpan(fn(Forms\Get $get) => $get('is_transfer') ? 1 : 2)
+                        ->columnSpan(fn (Forms\Get $get) => $get('is_transfer') ? 1 : 2)
                         // UX: Mostrar balance actual
-                        ->getOptionLabelFromRecordUsing(fn(Account $record) =>
-                        "{$record->name} (\${$record->balance})"
+                        ->getOptionLabelFromRecordUsing(fn (Account $record) => "{$record->name} (\${$record->balance})"
                         ),
 
                     Forms\Components\Select::make('to_account_id')
                         ->label('Cuenta Destino')
-                        ->options(fn(Forms\Get $get) => self::getCachedAccounts(
+                        ->options(fn (Forms\Get $get) => self::getCachedAccounts(
                             exclude: $get('account_id')
                         ))
                         ->searchable()
-                        ->required(fn(Forms\Get $get) => $get('is_transfer') === true)
-                        ->visible(fn(Forms\Get $get) => $get('is_transfer') === true)
+                        ->required(fn (Forms\Get $get) => $get('is_transfer') === true)
+                        ->visible(fn (Forms\Get $get) => $get('is_transfer') === true)
                         ->columnSpan(1)
-                        ->getOptionLabelFromRecordUsing(fn(Account $record) =>
-                        "{$record->name} (\${$record->balance})"
+                        ->getOptionLabelFromRecordUsing(fn (Account $record) => "{$record->name} (\${$record->balance})"
                         ),
 
                     Forms\Components\DatePicker::make('date')
@@ -193,6 +192,7 @@ class TransactionResource extends Resource
                                 ->title('No se puede duplicar')
                                 ->body('Las transferencias no se pueden duplicar directamente.')
                                 ->send();
+
                             return;
                         }
 
@@ -218,7 +218,6 @@ class TransactionResource extends Resource
             ]);
     }
 
-
     protected static function getCachedAccounts(?int $exclude = null): array
     {
         $cacheKey = $exclude ? "accounts_select_exclude_{$exclude}" : 'accounts_select';
@@ -243,7 +242,7 @@ class TransactionResource extends Resource
 
     protected static function getDynamicPlaceholder(?int $categoryId): string
     {
-        if (!$categoryId) {
+        if (! $categoryId) {
             return 'Ej: Compra supermercado';
         }
 
@@ -260,6 +259,7 @@ class TransactionResource extends Resource
 
         return $placeholders[$category?->name] ?? "Gasto en {$category?->name}";
     }
+
     public static function getHeaderActions(): array
     {
         return [
@@ -325,7 +325,7 @@ class TransactionResource extends Resource
 
     public static function create(): CreateTransaction
     {
-        return new CreateTransaction();
+        return new CreateTransaction;
     }
 
     public static function getPages(): array

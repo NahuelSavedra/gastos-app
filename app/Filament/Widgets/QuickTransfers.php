@@ -2,12 +2,9 @@
 
 namespace App\Filament\Widgets;
 
-use App\Models\Account;
 use App\Models\Category;
 use App\Models\Transaction;
 use App\Models\TransferTemplate;
-use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Widgets\Widget;
 use Illuminate\Support\Facades\DB;
@@ -15,12 +12,19 @@ use Illuminate\Support\Facades\DB;
 class QuickTransfers extends Widget
 {
     protected static string $view = 'filament.widgets.quick-transfers';
-    protected int | string | array $columnSpan = 'full';
+
+    protected int|string|array $columnSpan = 'full';
+
     protected static ?int $sort = 1;
 
+    protected static bool $isDiscovered = false;
+
     public ?int $selectedTemplateId = null;
+
     public ?float $amount = null;
+
     public ?string $date = null;
+
     public ?string $description = null;
 
     public function mount(): void
@@ -66,7 +70,7 @@ class QuickTransfers extends Widget
                     ['type' => 'income']
                 );
 
-                $referenceId = 'transfer_' . uniqid();
+                $referenceId = 'transfer_'.uniqid();
                 $description = $this->description ?: "Transferencia rápida: {$template->name}";
 
                 // Inserción masiva

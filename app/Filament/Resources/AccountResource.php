@@ -96,7 +96,7 @@ class AccountResource extends Resource
                 Tables\Columns\TextColumn::make('name')
                     ->label('Cuenta')
                     ->formatStateUsing(function (Account $record): string {
-                        return $record->account_icon . ' ' . $record->name;
+                        return $record->account_icon.' '.$record->name;
                     })
                     ->sortable()
                     ->searchable()

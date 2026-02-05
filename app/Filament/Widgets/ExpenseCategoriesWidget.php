@@ -3,22 +3,40 @@
 namespace App\Filament\Widgets;
 
 use App\Models\Transaction;
+use Carbon\Carbon;
 use Filament\Widgets\ChartWidget;
+use Filament\Widgets\Concerns\InteractsWithPageFilters;
 use Illuminate\Support\Facades\DB;
 
 class ExpenseCategoriesWidget extends ChartWidget
 {
+    use InteractsWithPageFilters;
+
     protected static ?int $sort = 3;
-    protected static ?string $heading = '📊 Gastos por Categoría (Este Mes)';
-    protected int | string | array $columnSpan = 'full';
+
+    protected int|string|array $columnSpan = 'full';
+
     protected static ?string $maxHeight = '300px';
+
+    public function getHeading(): string
+    {
+        $selectedMonth = $this->filters['month'] ?? now()->format('Y-m');
+        $date = Carbon::createFromFormat('Y-m', $selectedMonth);
+        $monthLabel = ucfirst($date->translatedFormat('F Y'));
+
+        return "📊 Gastos por Categoría - {$monthLabel}";
+    }
 
     protected function getData(): array
     {
+        $selectedMonth = $this->filters['month'] ?? now()->format('Y-m');
+        $date = Carbon::createFromFormat('Y-m', $selectedMonth);
+
         $data = Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('categories.type', 'expense')
-            ->whereMonth('transactions.date', now()->month)
-            ->whereYear('transactions.date', now()->year)
+            ->where('categories.name', '!=', 'Transfer')
+            ->whereMonth('transactions.date', $date->month)
+            ->whereYear('transactions.date', $date->year)
             ->select('categories.name', DB::raw('SUM(transactions.amount) as total'))
             ->groupBy('categories.id', 'categories.name')
             ->orderByDesc('total')

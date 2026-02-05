@@ -3,24 +3,42 @@
 namespace App\Filament\Widgets;
 
 use App\Models\Account;
+use App\Models\Category;
 use App\Models\Transaction;
+use Carbon\Carbon;
+use Filament\Widgets\Concerns\InteractsWithPageFilters;
 use Filament\Widgets\Widget;
-use Illuminate\Support\Facades\DB;
 
 class AccountsOverviewWidget extends Widget
 {
+    use InteractsWithPageFilters;
+
     protected static ?int $sort = 2;
-    protected int | string | array $columnSpan = 'full';
+
+    protected int|string|array $columnSpan = 'full';
+
     protected static string $view = 'filament.widgets.accounts-overview';
+
     protected static ?string $pollingInterval = '30s';
 
     public function getViewData(): array
     {
+        // Obtener el mes seleccionado del filtro
+        $selectedMonth = $this->filters['month'] ?? now()->format('Y-m');
+        $date = Carbon::createFromFormat('Y-m', $selectedMonth);
+        $month = $date->month;
+        $year = $date->year;
+
+        $monthLabel = ucfirst($date->translatedFormat('F Y'));
+
+        // Categoría de transferencias a excluir
+        $excludedCategoryIds = Category::where('name', 'Transfer')->pluck('id')->toArray();
+
         $accounts = Account::all();
         $accountsData = [];
 
         foreach ($accounts as $account) {
-            // Calcular balance actual
+            // Calcular balance actual (histórico completo)
             $income = Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
                 ->where('transactions.account_id', $account->id)
                 ->where('categories.type', 'income')
@@ -33,31 +51,29 @@ class AccountsOverviewWidget extends Widget
 
             $currentBalance = $account->initial_balance + $income - $expense;
 
-            // Balance del mes (excluyendo transferencias)
-            $excludedCategoryIds = [4]; // Categoría de transferencias
-
+            // Balance del mes seleccionado (excluyendo transferencias)
             $monthIncome = Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
                 ->where('transactions.account_id', $account->id)
                 ->where('categories.type', 'income')
                 ->whereNotIn('transactions.category_id', $excludedCategoryIds)
-                ->whereMonth('transactions.date', now()->month)
-                ->whereYear('transactions.date', now()->year)
+                ->whereMonth('transactions.date', $month)
+                ->whereYear('transactions.date', $year)
                 ->sum('transactions.amount');
 
             $monthExpense = Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
                 ->where('transactions.account_id', $account->id)
                 ->where('categories.type', 'expense')
                 ->whereNotIn('transactions.category_id', $excludedCategoryIds)
-                ->whereMonth('transactions.date', now()->month)
-                ->whereYear('transactions.date', now()->year)
+                ->whereMonth('transactions.date', $month)
+                ->whereYear('transactions.date', $year)
                 ->sum('transactions.amount');
 
             $monthBalance = $monthIncome - $monthExpense;
 
-            // Número de transacciones del mes
+            // Número de transacciones del mes seleccionado
             $transactionCount = Transaction::where('account_id', $account->id)
-                ->whereMonth('date', now()->month)
-                ->whereYear('date', now()->year)
+                ->whereMonth('date', $month)
+                ->whereYear('date', $year)
                 ->count();
 
             $accountsData[] = [
@@ -79,6 +95,7 @@ class AccountsOverviewWidget extends Widget
 
         return [
             'accounts' => $accountsData,
+            'monthLabel' => $monthLabel,
         ];
     }
 }

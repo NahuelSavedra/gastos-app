@@ -2,7 +2,6 @@
 
 namespace App\Filament\Widgets;
 
-use App\Filament\Resources\TransactionResource;
 use App\Models\TransactionTemplate;
 use Filament\Notifications\Notification;
 use Filament\Widgets\Widget;
@@ -10,11 +9,16 @@ use Filament\Widgets\Widget;
 class QuickTransactionsWidget extends Widget
 {
     protected static ?int $sort = 0;
+
+    protected static bool $isDiscovered = false;
+
     protected static string $view = 'filament.widgets.quick-transactions';
-    protected int | string | array $columnSpan = 'full';
+
+    protected int|string|array $columnSpan = 'full';
 
     // Propiedades públicas
     public array $amounts = [];
+
     public array $dates = []; // ✅ NUEVO
 
     public function getViewData(): array
@@ -37,12 +41,13 @@ class QuickTransactionsWidget extends Widget
     {
         $template = TransactionTemplate::findOrFail($templateId);
 
-        if (!$template->amount) {
+        if (! $template->amount) {
             Notification::make()
                 ->title('Error')
                 ->body('Este template requiere ingresar un monto')
                 ->danger()
                 ->send();
+
             return;
         }
 
@@ -74,12 +79,13 @@ class QuickTransactionsWidget extends Widget
 
         $amount = $this->amounts[$templateId] ?? null;
 
-        if (!$amount || $amount <= 0) {
+        if (! $amount || $amount <= 0) {
             Notification::make()
                 ->title('Error')
                 ->body('Por favor ingresa un monto válido')
                 ->danger()
                 ->send();
+
             return;
         }
 

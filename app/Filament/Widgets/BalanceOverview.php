@@ -4,67 +4,76 @@ namespace App\Filament\Widgets;
 
 use App\Models\Account;
 use App\Models\Transaction;
+use Carbon\Carbon;
+use Filament\Widgets\Concerns\InteractsWithPageFilters;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
 class BalanceOverview extends BaseWidget
 {
+    use InteractsWithPageFilters;
+
     protected static ?int $sort = 1;
-    protected int | string | array $columnSpan = 'full';
+
+    protected int|string|array $columnSpan = 'full';
+
     protected static ?string $pollingInterval = '30s';
 
     protected function getStats(): array
     {
-        $includedAccountIds = Account::where('include_in_totals', true)->pluck('id')->toArray();
+        // Obtener el mes seleccionado del filtro
+        $selectedMonth = $this->filters['month'] ?? now()->format('Y-m');
+        $date = Carbon::createFromFormat('Y-m', $selectedMonth);
+        $month = $date->month;
+        $year = $date->year;
 
-        // Categorías a excluir (Transferencias)
+        $isCurrentMonth = $date->isSameMonth(now());
+        $monthLabel = ucfirst($date->translatedFormat('F Y'));
+
+        $includedAccountIds = Account::where('include_in_totals', true)->pluck('id')->toArray();
         $excludedCategoryIds = $this->getExcludedCategories();
 
-        // Obtener totales del mes actual
-        $currentMonth = now()->month;
-        $currentYear = now()->year;
-
-        // INGRESOS del mes actual
+        // INGRESOS del mes seleccionado
         $totalIncome = Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('categories.type', 'income')
             ->whereNotIn('transactions.category_id', $excludedCategoryIds)
             ->whereIn('transactions.account_id', $includedAccountIds)
-            ->whereMonth('transactions.date', $currentMonth)
-            ->whereYear('transactions.date', $currentYear)
+            ->whereMonth('transactions.date', $month)
+            ->whereYear('transactions.date', $year)
             ->sum('transactions.amount');
 
-        // GASTOS del mes actual
+        // GASTOS del mes seleccionado
         $totalExpense = Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('categories.type', 'expense')
             ->whereNotIn('transactions.category_id', $excludedCategoryIds)
             ->whereIn('transactions.account_id', $includedAccountIds)
-            ->whereMonth('transactions.date', $currentMonth)
-            ->whereYear('transactions.date', $currentYear)
+            ->whereMonth('transactions.date', $month)
+            ->whereYear('transactions.date', $year)
             ->sum('transactions.amount');
 
         $balance = $totalIncome - $totalExpense;
 
-        // Calcular tendencias de los últimos 7 días
-        $incomeChart = $this->getLast7DaysData('income', $excludedCategoryIds, $includedAccountIds);
-        $expenseChart = $this->getLast7DaysData('expense', $excludedCategoryIds, $includedAccountIds);
+        // Calcular tendencias de los últimos 7 días del mes seleccionado
+        $incomeChart = $this->getChartData('income', $excludedCategoryIds, $includedAccountIds, $date);
+        $expenseChart = $this->getChartData('expense', $excludedCategoryIds, $includedAccountIds, $date);
 
         // Calcular mes anterior para comparación
-        $previousMonth = now()->subMonth();
+        $previousDate = $date->copy()->subMonth();
 
         $previousMonthIncome = Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('categories.type', 'income')
             ->whereNotIn('transactions.category_id', $excludedCategoryIds)
             ->whereIn('transactions.account_id', $includedAccountIds)
-            ->whereMonth('transactions.date', $previousMonth->month)
-            ->whereYear('transactions.date', $previousMonth->year)
+            ->whereMonth('transactions.date', $previousDate->month)
+            ->whereYear('transactions.date', $previousDate->year)
             ->sum('transactions.amount');
 
         $previousMonthExpense = Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
             ->where('categories.type', 'expense')
             ->whereNotIn('transactions.category_id', $excludedCategoryIds)
             ->whereIn('transactions.account_id', $includedAccountIds)
-            ->whereMonth('transactions.date', $previousMonth->month)
-            ->whereYear('transactions.date', $previousMonth->year)
+            ->whereMonth('transactions.date', $previousDate->month)
+            ->whereYear('transactions.date', $previousDate->year)
             ->sum('transactions.amount');
 
         // Calcular variaciones porcentuales
@@ -83,42 +92,31 @@ class BalanceOverview extends BaseWidget
         $excludedInfo = $this->getExcludedAccountsInfo();
 
         return [
-            Stat::make('💰 Ingresos del Mes', '$' . number_format($totalIncome, 2))
+            Stat::make('💰 Ingresos', '$' . number_format($totalIncome, 2))
                 ->description($this->getChangeDescription($incomeChange, 'income'))
                 ->descriptionIcon($incomeChange >= 0 ? 'heroicon-m-arrow-trending-up' : 'heroicon-m-arrow-trending-down')
                 ->color('success')
-                ->chart($incomeChart)
-                ->extraAttributes([
-                    'class' => 'relative',
-                ]),
+                ->chart($incomeChart),
 
-            Stat::make('💸 Gastos del Mes', '$' . number_format($totalExpense, 2))
+            Stat::make('💸 Gastos', '$' . number_format($totalExpense, 2))
                 ->description($this->getChangeDescription($expenseChange, 'expense'))
                 ->descriptionIcon($expenseChange >= 0 ? 'heroicon-m-arrow-trending-up' : 'heroicon-m-arrow-trending-down')
                 ->color('danger')
                 ->chart($expenseChart),
 
-            Stat::make('💳 Balance del Mes', '$' . number_format($balance, 2))
-                ->description($this->getBalanceDescription($balance, $totalIncome, $totalExpense, $savingsRate))
+            Stat::make('💳 Balance', '$' . number_format($balance, 2))
+                ->description($this->getBalanceDescription($balance, $totalIncome, $savingsRate))
                 ->descriptionIcon($balance >= 0 ? 'heroicon-m-check-circle' : 'heroicon-m-exclamation-triangle')
                 ->color($balance >= 0 ? 'success' : 'warning')
                 ->chart($this->getBalanceChart($incomeChart, $expenseChart)),
 
-            // ✅ NUEVO: Card de información sobre cuentas excluidas
             Stat::make('📊 Cuentas Incluidas', count($includedAccountIds) . ' de ' . Account::count())
                 ->description($excludedInfo['message'])
                 ->descriptionIcon('heroicon-m-information-circle')
-                ->color('info')
-                ->extraAttributes([
-                    'class' => 'cursor-pointer',
-                    'title' => $excludedInfo['tooltip'],
-                ]),
+                ->color('info'),
         ];
     }
 
-    /**
-     * Obtener categorías a excluir (Transferencias)
-     */
     private function getExcludedCategories(): array
     {
         return \App\Models\Category::where('name', 'Transfer')
@@ -126,9 +124,6 @@ class BalanceOverview extends BaseWidget
             ->toArray();
     }
 
-    /**
-     * Obtener información sobre cuentas excluidas
-     */
     private function getExcludedAccountsInfo(): array
     {
         $excludedAccounts = Account::where('include_in_totals', false)->get();
@@ -137,34 +132,38 @@ class BalanceOverview extends BaseWidget
         if ($excludedCount === 0) {
             return [
                 'message' => '✅ Todas las cuentas incluidas',
-                'tooltip' => 'Todos tus movimientos están siendo contabilizados',
             ];
         }
 
-        $excludedNames = $excludedAccounts->pluck('name')->toArray();
-        $namesList = implode(', ', $excludedNames);
+        $excludedNames = $excludedAccounts->pluck('name')->implode(', ');
 
         return [
-            'message' => "🔍 Excluidas: {$namesList}",
-            'tooltip' => "Estas cuentas no afectan los totales: {$namesList}",
+            'message' => "🔍 Excluidas: {$excludedNames}",
         ];
     }
 
-    /**
-     * Obtener datos de los últimos 7 días para el gráfico
-     */
-    private function getLast7DaysData(string $type, array $excludedCategories, array $includedAccounts): array
+    private function getChartData(string $type, array $excludedCategories, array $includedAccounts, Carbon $date): array
     {
         $data = [];
+        $endOfMonth = $date->copy()->endOfMonth();
+        $startDate = $date->copy()->startOfMonth();
 
-        for ($i = 6; $i >= 0; $i--) {
-            $date = now()->subDays($i)->toDateString();
+        // Si es el mes actual, mostrar hasta hoy
+        if ($date->isSameMonth(now())) {
+            $endOfMonth = now();
+        }
+
+        // Mostrar últimos 7 días del período
+        $days = min(7, $endOfMonth->day);
+
+        for ($i = $days - 1; $i >= 0; $i--) {
+            $dayDate = $endOfMonth->copy()->subDays($i)->toDateString();
 
             $amount = Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
                 ->where('categories.type', $type)
                 ->whereNotIn('transactions.category_id', $excludedCategories)
                 ->whereIn('transactions.account_id', $includedAccounts)
-                ->whereDate('transactions.date', $date)
+                ->whereDate('transactions.date', $dayDate)
                 ->sum('transactions.amount');
 
             $data[] = (float) $amount;
@@ -173,54 +172,42 @@ class BalanceOverview extends BaseWidget
         return $data;
     }
 
-    /**
-     * Generar descripción del cambio porcentual
-     */
     private function getChangeDescription(float $change, string $type): string
     {
         $absChange = abs($change);
         $formattedChange = number_format($absChange, 1);
 
         if ($change == 0) {
-            return "➡️ Sin cambios vs mes anterior";
+            return '➡️ Sin cambios vs mes anterior';
         }
 
         if ($type === 'income') {
-            if ($change > 0) {
-                return "↗️ +{$formattedChange}% vs mes anterior";
-            } else {
-                return "↘️ -{$formattedChange}% vs mes anterior";
-            }
-        } else { // expense
-            if ($change > 0) {
-                return "⚠️ +{$formattedChange}% más gastos vs mes anterior";
-            } else {
-                return "✅ -{$formattedChange}% menos gastos vs mes anterior";
-            }
+            return $change > 0
+                ? "↗️ +{$formattedChange}% vs mes anterior"
+                : "↘️ -{$formattedChange}% vs mes anterior";
         }
+
+        // expense
+        return $change > 0
+            ? "⚠️ +{$formattedChange}% más gastos"
+            : "✅ -{$formattedChange}% menos gastos";
     }
 
-    /**
-     * Generar descripción del saldo con tasa de ahorro
-     */
-    private function getBalanceDescription(float $balance, float $income, float $expense, float $savingsRate): string
+    private function getBalanceDescription(float $balance, float $income, float $savingsRate): string
     {
         if ($balance >= 0) {
             if ($income > 0) {
-                return "✅ Ahorraste " . number_format($savingsRate, 1) . "% de tus ingresos";
-            } else {
-                return "✅ Balance positivo";
+                return '✅ Ahorraste ' . number_format($savingsRate, 1) . '% de tus ingresos';
             }
-        } else {
-            $deficit = abs($balance);
-            $deficitPercent = $income > 0 ? ($deficit / $income) * 100 : 0;
-            return "⚠️ Déficit de $" . number_format($deficit, 2) . " (" . number_format($deficitPercent, 1) . "% de ingresos)";
+
+            return '✅ Balance positivo';
         }
+
+        $deficit = abs($balance);
+
+        return '⚠️ Déficit de $' . number_format($deficit, 2);
     }
 
-    /**
-     * Generar gráfico de balance (diferencia entre ingresos y gastos)
-     */
     private function getBalanceChart(array $incomeData, array $expenseData): array
     {
         $balanceData = [];

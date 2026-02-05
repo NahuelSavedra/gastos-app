@@ -5,12 +5,12 @@ namespace App\Livewire;
 use App\Models\Account;
 use App\Models\Category;
 use App\Models\Transaction;
+use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
-use Filament\Notifications\Notification;
 
 class BatchTransactionModal extends Component
 {
@@ -124,7 +124,7 @@ class BatchTransactionModal extends Component
     public function totalAmount(): float
     {
         return collect($this->lines)
-            ->filter(fn($line) => !empty($line['date']) && !empty($line['amount']))
+            ->filter(fn ($line) => ! empty($line['date']) && ! empty($line['amount']))
             ->sum('amount');
     }
 
@@ -132,7 +132,7 @@ class BatchTransactionModal extends Component
     public function totalCount(): int
     {
         return collect($this->lines)
-            ->filter(fn($line) => !empty($line['date']) && !empty($line['amount']))
+            ->filter(fn ($line) => ! empty($line['date']) && ! empty($line['amount']))
             ->count();
     }
 
@@ -162,7 +162,7 @@ class BatchTransactionModal extends Component
 
             // Filtrar líneas válidas
             $validLines = collect($this->lines)
-                ->filter(fn($line) => !empty($line['date']) && !empty($line['amount']) && $line['amount'] > 0)
+                ->filter(fn ($line) => ! empty($line['date']) && ! empty($line['amount']) && $line['amount'] > 0)
                 ->values()
                 ->toArray();
 
@@ -173,6 +173,7 @@ class BatchTransactionModal extends Component
                     ->body('Debes agregar al menos una transacción con fecha y monto')
                     ->send();
                 $this->saving = false;
+
                 return;
             }
 
@@ -181,11 +182,12 @@ class BatchTransactionModal extends Component
                 if ($line['amount'] <= 0) {
                     $this->addError("lines.{$index}.amount", 'El monto debe ser mayor a 0');
                     $this->saving = false;
+
                     return;
                 }
             }
 
-            Log::info('BatchTransactionModal: Iniciando creación de ' . count($validLines) . ' transacciones');
+            Log::info('BatchTransactionModal: Iniciando creación de '.count($validLines).' transacciones');
 
             DB::transaction(function () use ($validLines) {
                 $now = now();
@@ -207,7 +209,7 @@ class BatchTransactionModal extends Component
                 Transaction::insert($records);
             });
 
-            Log::info('BatchTransactionModal: Creación exitosa de ' . count($validLines) . ' transacciones');
+            Log::info('BatchTransactionModal: Creación exitosa de '.count($validLines).' transacciones');
 
             $count = count($validLines);
 

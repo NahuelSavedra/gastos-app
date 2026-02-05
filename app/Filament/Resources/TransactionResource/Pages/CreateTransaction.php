@@ -8,8 +8,8 @@ use App\Models\Category;
 use App\Models\Transaction;
 use Filament\Actions\Action;
 use Filament\Resources\Pages\CreateRecord;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 
 class CreateTransaction extends CreateRecord
@@ -25,6 +25,7 @@ class CreateTransaction extends CreateRecord
         if ($this->createAnother) {
             return $this->getResource()::getUrl('create');
         }
+
         return $this->getResource()::getUrl('index');
     }
 
@@ -77,6 +78,7 @@ class CreateTransaction extends CreateRecord
         // Prioridad 1: Datos de duplicación de transacción
         if (Session::has('duplicate_transaction_data')) {
             $duplicateData = Session::pull('duplicate_transaction_data');
+
             return array_merge($data, $duplicateData);
         }
 
@@ -123,13 +125,13 @@ class CreateTransaction extends CreateRecord
             // Optimización: Una sola query para ambas cuentas
             $accounts = Account::whereIn('id', [
                 $data['account_id'],
-                $data['to_account_id']
+                $data['to_account_id'],
             ])->get()->keyBy('id');
 
             $fromAccount = $accounts->get($data['account_id']);
             $toAccount = $accounts->get($data['to_account_id']);
 
-            if (!$fromAccount || !$toAccount) {
+            if (! $fromAccount || ! $toAccount) {
                 throw new \Exception('Una de las cuentas no existe.');
             }
 
@@ -147,10 +149,10 @@ class CreateTransaction extends CreateRecord
             // Obtener o crear categoría de ingreso (cacheada)
             $transferIncomeCategory = $this->getOrCreateTransferIncomeCategory();
 
-            $referenceId = 'transfer_' . uniqid();
+            $referenceId = 'transfer_'.uniqid();
             $date = $data['date'] ?? now();
             $baseTitle = $data['title'] ?: 'Transferencia';
-            $baseDescription = $data['description'] ?? "Transferencia entre cuentas";
+            $baseDescription = $data['description'] ?? 'Transferencia entre cuentas';
 
             // Optimización: Inserción masiva con una sola query
             $transactions = [
@@ -192,7 +194,7 @@ class CreateTransaction extends CreateRecord
         return Cache::remember(
             "category_{$categoryId}",
             3600,
-            fn() => Category::find($categoryId)
+            fn () => Category::find($categoryId)
         );
     }
 
