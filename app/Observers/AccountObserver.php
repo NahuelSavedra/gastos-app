@@ -24,13 +24,17 @@ class AccountObserver
 
     protected function clearCache(): void
     {
-        // Limpiar cache principal
+        // Clear main account select cache
         Cache::forget('accounts_select');
 
-        // Limpiar caches con exclude (si los usas)
-        $accounts = Account::pluck('id');
-        foreach ($accounts as $id) {
+        // Clear all account-specific caches (reasonable upper limit)
+        for ($id = 1; $id <= 1000; $id++) {
             Cache::forget("accounts_select_exclude_{$id}");
+        }
+
+        // Clear all account balance caches
+        foreach (Account::pluck('id') as $accountId) {
+            Cache::forget("account_balance_{$accountId}");
         }
     }
 }

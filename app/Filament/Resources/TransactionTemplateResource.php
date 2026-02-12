@@ -187,6 +187,7 @@ class TransactionTemplateResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn ($query) => $query->with(['category', 'account']))
             ->columns([
                 Tables\Columns\TextColumn::make('name')
                     ->label('Nombre')

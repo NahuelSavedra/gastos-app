@@ -3,7 +3,12 @@
     "allow": [
       "Bash(composer require:*)",
       "Bash(php artisan tinker:*)",
-      "Bash(pdftotext:*)"
+      "Bash(pdftotext:*)",
+      "Bash(where:*)",
+      "Bash(php -v:*)",
+      "Bash(ls:*)",
+      "Bash(php:*)",
+      "Bash(composer:*)"
     ]
   }
 }

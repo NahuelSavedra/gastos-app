@@ -6,7 +6,6 @@ use App\Filament\Resources\ImportCategoryRuleResource;
 use App\Models\Category;
 use App\Models\ImportCategoryRule;
 use App\Models\Transaction;
-use App\Services\Import\CategoryMatcher\CategoryMatcherService;
 use Filament\Actions;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -149,7 +148,7 @@ class ListImportCategoryRules extends ListRecords
                                         ->orderBy('name')
                                         ->get()
                                         ->mapWithKeys(fn ($cat) => [
-                                            $cat->id => ($cat->type === 'expense' ? '📉 ' : '📈 ') . $cat->name,
+                                            $cat->id => ($cat->type === 'expense' ? '📉 ' : '📈 ').$cat->name,
                                         ])
                                 )
                                 ->searchable()

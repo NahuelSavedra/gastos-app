@@ -82,12 +82,14 @@ class GaliciaPdfParser implements CsvParserInterface
                     // Stop if we hit page markers or footers
                     if ($this->isSkipLine($trimmedNext)) {
                         $i++;
+
                         continue;
                     }
 
                     // Skip empty lines
                     if (empty($trimmedNext)) {
                         $i++;
+
                         continue;
                     }
 
@@ -113,8 +115,8 @@ class GaliciaPdfParser implements CsvParserInterface
                 // Generate unique reference using transaction index to handle duplicates
                 $transactionIndex++;
                 $parsedDate = $this->parseDate($date);
-                $uniqueKey = $parsedDate . '_' . $transactionIndex . '_' . $parsed['type'] . '_' . $amount . '_' . ($isExpense ? 'D' : 'C');
-                $referenceId = $this->getReferencePrefix() . md5($uniqueKey);
+                $uniqueKey = $parsedDate.'_'.$transactionIndex.'_'.$parsed['type'].'_'.$amount.'_'.($isExpense ? 'D' : 'C');
+                $referenceId = $this->getReferencePrefix().md5($uniqueKey);
 
                 yield [
                     'source_id' => md5($uniqueKey),
@@ -195,7 +197,7 @@ class GaliciaPdfParser implements CsvParserInterface
     private function extractWithPdfParser(string $filePath): string
     {
         try {
-            $parser = new Parser();
+            $parser = new Parser;
             $pdf = $parser->parseFile($filePath);
 
             return $pdf->getText();
@@ -293,6 +295,7 @@ class GaliciaPdfParser implements CsvParserInterface
         $descriptionLines = array_map(function ($line) {
             $clean = preg_replace('/-?[\d.]+,\d{2}/', '', $line);
             $clean = preg_replace('/\s+\d{4}\s*$/', '', $clean);
+
             return trim($clean);
         }, $lines);
         $description = implode(' | ', array_filter($descriptionLines));
@@ -337,13 +340,16 @@ class GaliciaPdfParser implements CsvParserInterface
         // For purchases, look for merchant name
         if ($type === 'Compra débito') {
             foreach ($lines as $i => $line) {
-                if ($i === 0) continue; // Skip first line (has transaction type)
+                if ($i === 0) {
+                    continue;
+                } // Skip first line (has transaction type)
                 $line = trim($line);
 
                 // Look for known merchant patterns
                 if (preg_match('/^(PVS\*|DLO\*|MERPAGO\*)(.+)/i', $line, $matches)) {
                     $merchant = trim($matches[2]);
                     $merchant = preg_replace('/\s+/', ' ', $merchant);
+
                     return $merchant;
                 }
 
@@ -360,7 +366,9 @@ class GaliciaPdfParser implements CsvParserInterface
         // For automatic debits, look for service name
         if (in_array($type, ['Débito automático', 'Débito DEBIN'])) {
             foreach ($lines as $i => $line) {
-                if ($i === 0) continue;
+                if ($i === 0) {
+                    continue;
+                }
                 $line = trim($line);
                 if (! empty($line) &&
                     ! preg_match('/^\d{10,}/', $line) &&
@@ -377,7 +385,9 @@ class GaliciaPdfParser implements CsvParserInterface
         // For transfers, look for name
         if (in_array($type, ['Transferencia enviada', 'Transferencia recibida'])) {
             foreach ($lines as $i => $line) {
-                if ($i === 0) continue;
+                if ($i === 0) {
+                    continue;
+                }
                 $line = trim($line);
 
                 // Skip technical lines
@@ -400,7 +410,9 @@ class GaliciaPdfParser implements CsvParserInterface
         // For salary
         if ($type === 'Sueldo') {
             foreach ($lines as $i => $line) {
-                if ($i === 0) continue;
+                if ($i === 0) {
+                    continue;
+                }
                 $line = trim($line);
                 if (! empty($line) &&
                     ! preg_match('/^\d{10,}/', $line) &&
@@ -414,7 +426,9 @@ class GaliciaPdfParser implements CsvParserInterface
         // For investments
         if (in_array($type, ['Inversión', 'Rescate inversión'])) {
             foreach ($lines as $i => $line) {
-                if ($i === 0) continue;
+                if ($i === 0) {
+                    continue;
+                }
                 $line = trim($line);
                 if (str_contains(strtoupper($line), 'FIMA')) {
                     return trim($line);
@@ -425,7 +439,9 @@ class GaliciaPdfParser implements CsvParserInterface
         // For interests
         if ($type === 'Intereses') {
             foreach ($lines as $i => $line) {
-                if ($i === 0) continue;
+                if ($i === 0) {
+                    continue;
+                }
                 $line = trim($line);
                 if (! empty($line) && strlen($line) > 3) {
                     return trim($line);
@@ -451,7 +467,7 @@ class GaliciaPdfParser implements CsvParserInterface
         if (preg_match('/^(\d{2})\/(\d{2})\/(\d{2})$/', $dateString, $matches)) {
             $day = $matches[1];
             $month = $matches[2];
-            $year = '20' . $matches[3];
+            $year = '20'.$matches[3];
 
             return "{$year}-{$month}-{$day}";
         }

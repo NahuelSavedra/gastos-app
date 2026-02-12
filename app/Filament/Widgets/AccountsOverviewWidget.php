@@ -23,60 +23,54 @@ class AccountsOverviewWidget extends Widget
 
     public function getViewData(): array
     {
-        // Obtener el mes seleccionado del filtro
         $selectedMonth = $this->filters['month'] ?? now()->format('Y-m');
         $date = Carbon::createFromFormat('Y-m', $selectedMonth);
         $month = $date->month;
         $year = $date->year;
-
         $monthLabel = ucfirst($date->translatedFormat('F Y'));
 
-        // Categoría de transferencias a excluir
+        // Get transfer category IDs to exclude
         $excludedCategoryIds = Category::where('name', 'Transfer')->pluck('id')->toArray();
+        $excludedCategoriesStr = implode(',', $excludedCategoryIds ?: [0]);
 
-        $accounts = Account::all();
-        $accountsData = [];
+        // OPTIMIZATION: Single query with all aggregates
+        $accounts = Account::query()
+            ->select([
+                'accounts.*',
+                // Current balance (all time)
+                \DB::raw('COALESCE(SUM(CASE WHEN categories.type = "income" THEN transactions.amount ELSE 0 END), 0) as total_income'),
+                \DB::raw('COALESCE(SUM(CASE WHEN categories.type = "expense" THEN transactions.amount ELSE 0 END), 0) as total_expense'),
+                // Month balance (excluding transfers)
+                \DB::raw('COALESCE(SUM(CASE
+                    WHEN categories.type = "income"
+                    AND transactions.category_id NOT IN ('.$excludedCategoriesStr.')
+                    AND strftime("%m", transactions.date) = "'.str_pad($month, 2, '0', STR_PAD_LEFT).'"
+                    AND strftime("%Y", transactions.date) = "'.$year.'"
+                    THEN transactions.amount ELSE 0 END), 0) as month_income'),
+                \DB::raw('COALESCE(SUM(CASE
+                    WHEN categories.type = "expense"
+                    AND transactions.category_id NOT IN ('.$excludedCategoriesStr.')
+                    AND strftime("%m", transactions.date) = "'.str_pad($month, 2, '0', STR_PAD_LEFT).'"
+                    AND strftime("%Y", transactions.date) = "'.$year.'"
+                    THEN transactions.amount ELSE 0 END), 0) as month_expense'),
+                // Transaction count for month
+                \DB::raw('COUNT(CASE
+                    WHEN strftime("%m", transactions.date) = "'.str_pad($month, 2, '0', STR_PAD_LEFT).'"
+                    AND strftime("%Y", transactions.date) = "'.$year.'"
+                    THEN 1 END) as transaction_count'),
+            ])
+            ->leftJoin('transactions', 'accounts.id', '=', 'transactions.account_id')
+            ->leftJoin('categories', 'transactions.category_id', '=', 'categories.id')
+            ->groupBy('accounts.id', 'accounts.name', 'accounts.account_type', 'accounts.color',
+                'accounts.icon', 'accounts.initial_balance', 'accounts.include_in_totals',
+                'accounts.description', 'accounts.created_at', 'accounts.updated_at')
+            ->get();
 
-        foreach ($accounts as $account) {
-            // Calcular balance actual (histórico completo)
-            $income = Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
-                ->where('transactions.account_id', $account->id)
-                ->where('categories.type', 'income')
-                ->sum('transactions.amount');
+        $accountsData = $accounts->map(function ($account) {
+            $currentBalance = $account->initial_balance + $account->total_income - $account->total_expense;
+            $monthBalance = $account->month_income - $account->month_expense;
 
-            $expense = Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
-                ->where('transactions.account_id', $account->id)
-                ->where('categories.type', 'expense')
-                ->sum('transactions.amount');
-
-            $currentBalance = $account->initial_balance + $income - $expense;
-
-            // Balance del mes seleccionado (excluyendo transferencias)
-            $monthIncome = Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
-                ->where('transactions.account_id', $account->id)
-                ->where('categories.type', 'income')
-                ->whereNotIn('transactions.category_id', $excludedCategoryIds)
-                ->whereMonth('transactions.date', $month)
-                ->whereYear('transactions.date', $year)
-                ->sum('transactions.amount');
-
-            $monthExpense = Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
-                ->where('transactions.account_id', $account->id)
-                ->where('categories.type', 'expense')
-                ->whereNotIn('transactions.category_id', $excludedCategoryIds)
-                ->whereMonth('transactions.date', $month)
-                ->whereYear('transactions.date', $year)
-                ->sum('transactions.amount');
-
-            $monthBalance = $monthIncome - $monthExpense;
-
-            // Número de transacciones del mes seleccionado
-            $transactionCount = Transaction::where('account_id', $account->id)
-                ->whereMonth('date', $month)
-                ->whereYear('date', $year)
-                ->count();
-
-            $accountsData[] = [
+            return [
                 'id' => $account->id,
                 'name' => $account->name,
                 'type' => $account->account_type ?? 'checking',
@@ -86,12 +80,12 @@ class AccountsOverviewWidget extends Widget
                 'initial_balance' => $account->initial_balance,
                 'current_balance' => $currentBalance,
                 'month_balance' => $monthBalance,
-                'month_income' => $monthIncome,
-                'month_expense' => $monthExpense,
-                'transaction_count' => $transactionCount,
+                'month_income' => $account->month_income,
+                'month_expense' => $account->month_expense,
+                'transaction_count' => $account->transaction_count,
                 'include_in_totals' => $account->include_in_totals ?? true,
             ];
-        }
+        })->toArray();
 
         return [
             'accounts' => $accountsData,

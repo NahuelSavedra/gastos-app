@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Filament\Widgets\AccountsOverviewWidget;
 use App\Filament\Widgets\BalanceOverview;
 use App\Filament\Widgets\ExpenseCategoriesWidget;
+use App\Filament\Widgets\FinancialAssistantWidget;
 use App\Filament\Widgets\TransactionsTable;
 use Carbon\Carbon;
 use Filament\Forms\Components\Select;
@@ -47,6 +48,9 @@ class Dashboard extends BaseDashboard
     public function getWidgets(): array
     {
         return [
+            // 🤖 PRIORIDAD 0: Asistente Financiero AI
+            FinancialAssistantWidget::class,
+
             // 🏆 PRIORIDAD 1: Totales generales
             BalanceOverview::class,
 

@@ -25,6 +25,9 @@ class Transaction extends Model
 
     protected $appends = ['type']; // Para que siempre esté disponible
 
+    // Automatically eager load in all queries
+    protected $with = ['category'];
+
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
@@ -95,5 +98,42 @@ class Transaction extends Model
         return $query->whereHas('category', function ($q) {
             $q->where('name', 'Transfer');
         });
+    }
+
+    /**
+     * Scope for specific month and year
+     */
+    public function scopeForMonth($query, int $month, int $year)
+    {
+        return $query->whereMonth('date', $month)
+            ->whereYear('date', $year);
+    }
+
+    /**
+     * Scope to exclude transfers
+     */
+    public function scopeExcludeTransfers($query)
+    {
+        $transferCategoryId = Category::getTransferCategoryId();
+
+        return $transferCategoryId
+            ? $query->where('category_id', '!=', $transferCategoryId)
+            : $query;
+    }
+
+    /**
+     * Scope for date range
+     */
+    public function scopeBetweenDates($query, $startDate, $endDate)
+    {
+        return $query->whereBetween('date', [$startDate, $endDate]);
+    }
+
+    /**
+     * Scope for specific account
+     */
+    public function scopeForAccount($query, int $accountId)
+    {
+        return $query->where('account_id', $accountId);
     }
 }

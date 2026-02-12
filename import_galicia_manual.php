@@ -11,7 +11,6 @@ $app = require_once __DIR__.'/bootstrap/app.php';
 $app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
 use App\Models\Transaction;
-use App\Models\Category;
 use Illuminate\Support\Facades\DB;
 
 $accountId = 1; // Galicia
@@ -98,18 +97,19 @@ try {
             }
         }
 
-        if (!$categoryId) {
+        if (! $categoryId) {
             // Fallback a categoría genérica
             $categoryId = $tx['is_expense'] ? 12 : 23; // Desconocidos / Ingreso de dinero
         }
 
         // Generar reference_id único
-        $referenceId = 'import_galicia_manual_' . md5($tx['date'] . '_' . $index . '_' . $tx['description'] . '_' . $tx['amount']);
+        $referenceId = 'import_galicia_manual_'.md5($tx['date'].'_'.$index.'_'.$tx['description'].'_'.$tx['amount']);
 
         // Verificar duplicados
         if (Transaction::where('reference_id', $referenceId)->exists()) {
             echo "⏭️  Saltando (duplicado): {$tx['date']} - {$tx['description']} - \${$tx['amount']}\n";
             $skipped++;
+
             continue;
         }
 
@@ -136,8 +136,8 @@ try {
     echo "✅ Importadas: {$imported}\n";
     echo "⏭️  Saltadas (duplicados): {$skipped}\n";
 
-    if (!empty($errors)) {
-        echo "❌ Errores: " . count($errors) . "\n";
+    if (! empty($errors)) {
+        echo '❌ Errores: '.count($errors)."\n";
         foreach ($errors as $error) {
             echo "   - {$error}\n";
         }
@@ -145,7 +145,7 @@ try {
 
 } catch (\Exception $e) {
     DB::rollBack();
-    echo "❌ Error: " . $e->getMessage() . "\n";
+    echo '❌ Error: '.$e->getMessage()."\n";
     exit(1);
 }
 

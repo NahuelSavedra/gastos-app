@@ -90,18 +90,8 @@ class TransferService
             ]);
         }
 
-        // Verificar que las cuentas existen
-        if (! Account::where('id', $data['from_account_id'])->exists()) {
-            throw ValidationException::withMessages([
-                'from_account_id' => ['La cuenta origen no existe.'],
-            ]);
-        }
-
-        if (! Account::where('id', $data['to_account_id'])->exists()) {
-            throw ValidationException::withMessages([
-                'to_account_id' => ['La cuenta destino no existe.'],
-            ]);
-        }
+        // Note: Account existence is validated by findOrFail() in createTransfer()
+        // No need for duplicate exists() checks here
     }
 
     /**

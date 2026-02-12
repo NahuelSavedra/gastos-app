@@ -6,6 +6,7 @@ use App\Models\Transaction;
 use Carbon\Carbon;
 use Filament\Widgets\ChartWidget;
 use Filament\Widgets\Concerns\InteractsWithPageFilters;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class ExpenseCategoriesWidget extends ChartWidget
@@ -32,16 +33,21 @@ class ExpenseCategoriesWidget extends ChartWidget
         $selectedMonth = $this->filters['month'] ?? now()->format('Y-m');
         $date = Carbon::createFromFormat('Y-m', $selectedMonth);
 
-        $data = Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
-            ->where('categories.type', 'expense')
-            ->where('categories.name', '!=', 'Transfer')
-            ->whereMonth('transactions.date', $date->month)
-            ->whereYear('transactions.date', $date->year)
-            ->select('categories.name', DB::raw('SUM(transactions.amount) as total'))
-            ->groupBy('categories.id', 'categories.name')
-            ->orderByDesc('total')
-            ->limit(10)
-            ->get();
+        // OPTIMIZATION: Cache chart data for 5 minutes
+        $cacheKey = "expense_categories_chart_{$selectedMonth}";
+
+        $data = Cache::remember($cacheKey, 300, function () use ($date) {
+            return Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
+                ->where('categories.type', 'expense')
+                ->where('categories.name', '!=', 'Transfer')
+                ->whereMonth('transactions.date', $date->month)
+                ->whereYear('transactions.date', $date->year)
+                ->select('categories.name', DB::raw('SUM(transactions.amount) as total'))
+                ->groupBy('categories.id', 'categories.name')
+                ->orderByDesc('total')
+                ->limit(10)
+                ->get();
+        });
 
         return [
             'datasets' => [

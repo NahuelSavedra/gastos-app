@@ -63,8 +63,8 @@ class TransactionsTable extends BaseWidget
 
                 TextColumn::make('amount')
                     ->label('💵 Monto')
-                    ->formatStateUsing(fn ($state, $record): string => ($record->category?->type === 'expense' ? '-' : '+') .
-                        '$' . number_format($state, 2)
+                    ->formatStateUsing(fn ($state, $record): string => ($record->category?->type === 'expense' ? '-' : '+').
+                        '$'.number_format($state, 2)
                     )
                     ->color(fn ($record): string => $record->category?->type === 'income' ? 'success' : 'danger')
                     ->sortable()

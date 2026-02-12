@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Cache;
 
 class Account extends Model
 {
@@ -76,21 +77,33 @@ class Account extends Model
     }
 
     /**
-     * Obtener el balance actual calculado
+     * Obtener el balance actual calculado (con caché)
      */
     public function getCurrentBalanceAttribute(): float
     {
-        $income = $this->transactions()
-            ->join('categories', 'transactions.category_id', '=', 'categories.id')
-            ->where('categories.type', 'income')
-            ->sum('transactions.amount');
+        $cacheKey = "account_balance_{$this->id}";
 
-        $expense = $this->transactions()
-            ->join('categories', 'transactions.category_id', '=', 'categories.id')
-            ->where('categories.type', 'expense')
-            ->sum('transactions.amount');
+        return Cache::remember($cacheKey, 300, function () { // 5 minute cache
+            $income = $this->transactions()
+                ->join('categories', 'transactions.category_id', '=', 'categories.id')
+                ->where('categories.type', 'income')
+                ->sum('transactions.amount');
 
-        return $this->initial_balance + $income - $expense;
+            $expense = $this->transactions()
+                ->join('categories', 'transactions.category_id', '=', 'categories.id')
+                ->where('categories.type', 'expense')
+                ->sum('transactions.amount');
+
+            return $this->initial_balance + $income - $expense;
+        });
+    }
+
+    /**
+     * Clear balance cache for this account
+     */
+    public function clearBalanceCache(): void
+    {
+        Cache::forget("account_balance_{$this->id}");
     }
 
     /**

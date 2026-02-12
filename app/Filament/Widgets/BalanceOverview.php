@@ -92,25 +92,25 @@ class BalanceOverview extends BaseWidget
         $excludedInfo = $this->getExcludedAccountsInfo();
 
         return [
-            Stat::make('💰 Ingresos', '$' . number_format($totalIncome, 2))
+            Stat::make('💰 Ingresos', '$'.number_format($totalIncome, 2))
                 ->description($this->getChangeDescription($incomeChange, 'income'))
                 ->descriptionIcon($incomeChange >= 0 ? 'heroicon-m-arrow-trending-up' : 'heroicon-m-arrow-trending-down')
                 ->color('success')
                 ->chart($incomeChart),
 
-            Stat::make('💸 Gastos', '$' . number_format($totalExpense, 2))
+            Stat::make('💸 Gastos', '$'.number_format($totalExpense, 2))
                 ->description($this->getChangeDescription($expenseChange, 'expense'))
                 ->descriptionIcon($expenseChange >= 0 ? 'heroicon-m-arrow-trending-up' : 'heroicon-m-arrow-trending-down')
                 ->color('danger')
                 ->chart($expenseChart),
 
-            Stat::make('💳 Balance', '$' . number_format($balance, 2))
+            Stat::make('💳 Balance', '$'.number_format($balance, 2))
                 ->description($this->getBalanceDescription($balance, $totalIncome, $savingsRate))
                 ->descriptionIcon($balance >= 0 ? 'heroicon-m-check-circle' : 'heroicon-m-exclamation-triangle')
                 ->color($balance >= 0 ? 'success' : 'warning')
                 ->chart($this->getBalanceChart($incomeChart, $expenseChart)),
 
-            Stat::make('📊 Cuentas Incluidas', count($includedAccountIds) . ' de ' . Account::count())
+            Stat::make('📊 Cuentas Incluidas', count($includedAccountIds).' de '.Account::count())
                 ->description($excludedInfo['message'])
                 ->descriptionIcon('heroicon-m-information-circle')
                 ->color('info'),
@@ -144,9 +144,7 @@ class BalanceOverview extends BaseWidget
 
     private function getChartData(string $type, array $excludedCategories, array $includedAccounts, Carbon $date): array
     {
-        $data = [];
         $endOfMonth = $date->copy()->endOfMonth();
-        $startDate = $date->copy()->startOfMonth();
 
         // Si es el mes actual, mostrar hasta hoy
         if ($date->isSameMonth(now())) {
@@ -155,18 +153,28 @@ class BalanceOverview extends BaseWidget
 
         // Mostrar últimos 7 días del período
         $days = min(7, $endOfMonth->day);
+        $startDay = $endOfMonth->copy()->subDays($days - 1);
 
+        // OPTIMIZATION: Single query with GROUP BY date
+        $results = Transaction::query()
+            ->join('categories', 'transactions.category_id', '=', 'categories.id')
+            ->select([
+                \DB::raw('DATE(transactions.date) as transaction_date'),
+                \DB::raw('SUM(transactions.amount) as total'),
+            ])
+            ->where('categories.type', $type)
+            ->whereNotIn('transactions.category_id', $excludedCategories)
+            ->whereIn('transactions.account_id', $includedAccounts)
+            ->whereBetween('transactions.date', [$startDay->toDateString(), $endOfMonth->toDateString()])
+            ->groupBy('transaction_date')
+            ->orderBy('transaction_date')
+            ->pluck('total', 'transaction_date');
+
+        // Fill in missing dates with 0
+        $data = [];
         for ($i = $days - 1; $i >= 0; $i--) {
             $dayDate = $endOfMonth->copy()->subDays($i)->toDateString();
-
-            $amount = Transaction::join('categories', 'transactions.category_id', '=', 'categories.id')
-                ->where('categories.type', $type)
-                ->whereNotIn('transactions.category_id', $excludedCategories)
-                ->whereIn('transactions.account_id', $includedAccounts)
-                ->whereDate('transactions.date', $dayDate)
-                ->sum('transactions.amount');
-
-            $data[] = (float) $amount;
+            $data[] = (float) ($results[$dayDate] ?? 0);
         }
 
         return $data;
@@ -197,7 +205,7 @@ class BalanceOverview extends BaseWidget
     {
         if ($balance >= 0) {
             if ($income > 0) {
-                return '✅ Ahorraste ' . number_format($savingsRate, 1) . '% de tus ingresos';
+                return '✅ Ahorraste '.number_format($savingsRate, 1).'% de tus ingresos';
             }
 
             return '✅ Balance positivo';
@@ -205,7 +213,7 @@ class BalanceOverview extends BaseWidget
 
         $deficit = abs($balance);
 
-        return '⚠️ Déficit de $' . number_format($deficit, 2);
+        return '⚠️ Déficit de $'.number_format($deficit, 2);
     }
 
     private function getBalanceChart(array $incomeData, array $expenseData): array

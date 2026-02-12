@@ -30,6 +30,8 @@ class TransactionTemplate extends Model
         'last_generated_at' => 'date',
     ];
 
+    protected $with = ['category', 'account'];
+
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
