@@ -13,7 +13,7 @@
         <button
             type="button"
             @click="setAmount(amount)"
-            class="px-3 py-1.5 text-sm bg-gray-100 hover:bg-primary-100 hover:text-primary-700 rounded-lg transition-colors font-medium"
+            class="px-3 py-1.5 text-sm bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-primary-100 dark:hover:bg-primary-900/30 hover:text-primary-700 dark:hover:text-primary-400 rounded-lg transition-colors font-medium border border-zinc-200 dark:border-zinc-700"
             x-text="'$' + amount.toLocaleString()"
         ></button>
     </template>

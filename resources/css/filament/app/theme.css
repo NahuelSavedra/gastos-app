@@ -1,0 +1,91 @@
+@import '../../../../vendor/filament/filament/resources/css/theme.css';
+
+@config 'tailwind.config.js';
+
+/*
+ * Minimal Theme - Custom Filament Overrides
+ * Inspired by filamentthemes.com/themes/minimal
+ */
+
+/* ===== Global Surface Styles ===== */
+:root {
+    --minimal-border: 1px;
+    --minimal-radius: 0.5rem;
+    --minimal-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
+/* ===== Cards & Sections ===== */
+.fi-section {
+    @apply shadow-sm border border-zinc-200 dark:border-zinc-800;
+    border-radius: var(--minimal-radius);
+}
+
+.fi-section-content-ctn {
+    @apply border-t border-zinc-100 dark:border-zinc-800;
+}
+
+/* ===== Sidebar ===== */
+.fi-sidebar {
+    @apply border-r border-zinc-200 dark:border-zinc-800;
+}
+
+.fi-sidebar-nav-groups {
+    @apply gap-1;
+}
+
+.fi-sidebar-item {
+    @apply rounded-md;
+}
+
+/* ===== Tables ===== */
+.fi-ta-table {
+    @apply border-zinc-200 dark:border-zinc-800;
+}
+
+.fi-ta-row:hover td {
+    @apply bg-zinc-50/50 dark:bg-zinc-800/50;
+}
+
+.fi-ta-header-cell {
+    @apply text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400;
+}
+
+/* ===== Stat Cards ===== */
+.fi-wi-stats-overview-stat {
+    @apply shadow-sm border border-zinc-200 dark:border-zinc-800 rounded-lg;
+}
+
+/* ===== Buttons ===== */
+.fi-btn {
+    @apply shadow-sm;
+    border-radius: var(--minimal-radius);
+}
+
+/* ===== Form Inputs ===== */
+.fi-input-wrp {
+    @apply shadow-sm border-zinc-300 dark:border-zinc-700;
+    border-radius: var(--minimal-radius);
+}
+
+/* ===== Badges ===== */
+.fi-badge {
+    @apply font-medium;
+}
+
+/* ===== Top Bar ===== */
+.fi-topbar {
+    @apply border-b border-zinc-200 dark:border-zinc-800;
+}
+
+/* ===== Modal ===== */
+.fi-modal-window {
+    @apply shadow-lg border border-zinc-200 dark:border-zinc-800;
+    border-radius: var(--minimal-radius);
+}
+
+/* ===== Transitions ===== */
+.fi-section,
+.fi-wi-stats-overview-stat,
+.fi-ta-row {
+    @apply transition-all duration-150 ease-in-out;
+}
