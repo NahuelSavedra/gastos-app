@@ -4,9 +4,11 @@ namespace App\Providers;
 
 use App\Models\Account;
 use App\Models\Category;
+use App\Models\InstallmentPurchase;
 use App\Models\Transaction;
 use App\Observers\AccountObserver;
 use App\Observers\CategoryObserver;
+use App\Observers\InstallmentPurchaseObserver;
 use App\Observers\TransactionObserver;
 use App\Services\Import\CategoryMatcher\CategoryMatcherService;
 use App\Services\Import\TransactionImportService;
@@ -31,5 +33,6 @@ class AppServiceProvider extends ServiceProvider
         Category::observe(CategoryObserver::class);
         Account::observe(AccountObserver::class);
         Transaction::observe(TransactionObserver::class);
+        InstallmentPurchase::observe(InstallmentPurchaseObserver::class);
     }
 }

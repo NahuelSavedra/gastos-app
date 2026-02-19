@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Filament\Widgets\AccountsOverviewWidget;
 use App\Filament\Widgets\BalanceOverview;
+use App\Filament\Widgets\CreditCardsOverviewWidget;
 use App\Filament\Widgets\ExpenseCategoriesWidget;
 use App\Filament\Widgets\FinancialAssistantWidget;
 use App\Filament\Widgets\TransactionsTable;
@@ -59,6 +60,9 @@ class Dashboard extends BaseDashboard
 
             // 🏦 PRIORIDAD 2: Resumen de cuentas
             AccountsOverviewWidget::class,
+
+            // 💳 PRIORIDAD 2.5: Tarjetas de crédito
+            CreditCardsOverviewWidget::class,
 
             // 📊 PRIORIDAD 3: Gastos por categorías
             ExpenseCategoriesWidget::class,
