@@ -1,15 +1,20 @@
+# Stage 1: Build frontend assets
+FROM node:22-slim AS node-build
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+# Stage 2: PHP application
 FROM php:8.4-cli
 
-# Install system dependencies + PHP extensions
 RUN apt-get update && apt-get install -y \
-    git zip unzip curl libicu-dev sqlite3 libzip-dev \
-    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-    && apt-get install -y nodejs \
+    git zip unzip libicu-dev sqlite3 libzip-dev \
     && docker-php-ext-configure intl \
     && docker-php-ext-install pdo pdo_sqlite intl zip opcache pcntl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /app
@@ -18,17 +23,13 @@ WORKDIR /app
 COPY composer.json composer.lock ./
 RUN composer install --optimize-autoloader --no-dev --no-interaction
 
-# Install Node dependencies (cached layer)
-COPY package.json package-lock.json ./
-RUN npm ci
-
-# Copy full application
+# Copy application source
 COPY . .
 
-# Build frontend assets
-RUN npm run build && npm prune --omit=dev
+# Copy built frontend assets from node stage
+COPY --from=node-build /app/public/build ./public/build
 
-# Permissions
+# Permissions + ensure SQLite file exists
 RUN chmod -R 775 storage bootstrap/cache \
     && mkdir -p database \
     && touch database/database.sqlite
