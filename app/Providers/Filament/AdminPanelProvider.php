@@ -25,7 +25,7 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('app')
             ->path('/')
-            ->login()
+            // ->login()
             ->darkMode(true)
             ->colors([
                 'primary' => Color::Slate,
@@ -61,7 +61,7 @@ class AdminPanelProvider extends PanelProvider
                 DispatchServingFilamentEvent::class,
             ])
             ->authMiddleware([
-                Authenticate::class,
+                // Authenticate::class,
             ]);
     }
 }
