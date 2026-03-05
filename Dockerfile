@@ -1,12 +1,19 @@
-# Stage 1: Build frontend assets
+# Stage 1: Install PHP dependencies (needs vendor for Tailwind/Filament config in Vite)
+FROM composer:latest AS composer-build
+WORKDIR /app
+COPY composer.json composer.lock ./
+RUN composer install --optimize-autoloader --no-dev --no-scripts --ignore-platform-reqs --no-interaction
+
+# Stage 2: Build frontend assets (requires vendor/filament for tailwind.config.js)
 FROM node:22-slim AS node-build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
+COPY --from=composer-build /app/vendor ./vendor
 RUN npm run build
 
-# Stage 2: PHP application
+# Stage 3: Final PHP application
 FROM php:8.4-cli
 
 RUN apt-get update && apt-get install -y \
@@ -19,21 +26,17 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /app
 
-# Install PHP dependencies (cached layer)
-COPY composer.json composer.lock ./
-RUN composer install --optimize-autoloader --no-dev --no-interaction
-
-# Copy application source
+COPY --from=composer-build /app/vendor ./vendor
 COPY . .
-
-# Copy built frontend assets from node stage
 COPY --from=node-build /app/public/build ./public/build
 
-# Permissions + ensure SQLite file exists
+# Re-run autoload dump with proper PHP (composer-build used --no-scripts)
+RUN composer dump-autoload --optimize --no-dev --no-scripts
+
 RUN chmod -R 775 storage bootstrap/cache \
     && mkdir -p database \
     && touch database/database.sqlite
 
 EXPOSE 8080
 
-CMD ["sh", "-c", "php artisan config:cache && php artisan migrate --force --no-interaction && php artisan serve --host=0.0.0.0 --port=${PORT:-8080}"]
+CMD ["sh", "-c", "php artisan package:discover --ansi && php artisan config:cache && php artisan migrate --force --no-interaction && php artisan serve --host=0.0.0.0 --port=${PORT:-8080}"]
