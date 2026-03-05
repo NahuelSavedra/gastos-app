@@ -13,19 +13,8 @@ export default defineConfig({
         }),
     ],
     build: {
-        minify: 'terser',
-        terserOptions: {
-            compress: {
-                drop_console: true, // Remove console.logs in production
-            },
-        },
-        rollupOptions: {
-            output: {
-                manualChunks: {
-                    vendor: ['alpinejs'],
-                },
-            },
-        },
+        minify: 'esbuild',
+        rollupOptions: {},
         chunkSizeWarningLimit: 1000,
     },
 })

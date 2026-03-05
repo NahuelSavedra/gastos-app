@@ -1,4 +1,10 @@
 <x-filament-widgets::widget>
+    @php
+        $viewData = $this->getViewData();
+        $accounts = $viewData['accounts'];
+        $monthLabel = $viewData['monthLabel'];
+    @endphp
+
     <x-filament::section>
         <x-slot name="heading">
             <div class="flex items-center gap-2">
@@ -8,115 +14,110 @@
         </x-slot>
 
         <x-slot name="description">
-            Movimientos de {{ $this->getViewData()['monthLabel'] }}
+            Movimientos de {{ $monthLabel }}
         </x-slot>
 
-        <div class="grid gap-5 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
-            @foreach($this->getViewData()['accounts'] as $account)
-                <div class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-200">
+        <div class="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
+            @foreach($accounts as $account)
+                @php
+                    $color = $account['color'] ?? '#64748b';
+                    $balance = $account['current_balance'];
+                    $monthBalance = $account['month_balance'];
+                @endphp
 
-                    {{-- Colored left accent --}}
-                    <div class="absolute inset-y-0 left-0 w-1 rounded-l-lg" style="background-color: {{ $account['color'] ?? '#64748b' }};"></div>
+                <div class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+
+                    {{-- Colored top bar --}}
+                    <div class="h-1.5 w-full" style="background: linear-gradient(90deg, {{ $color }}, {{ $color }}99);"></div>
 
                     {{-- Header --}}
-                    <div class="p-5 pb-4 pl-6">
-                        <div class="flex items-center justify-between mb-3">
-                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
-                                {{ $account['type_label'] ?? 'Cuenta' }}
-                            </span>
+                    <div class="p-5 pb-3">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background-color: {{ $color }}20; border: 1px solid {{ $color }}40;">
+                                    <span class="text-sm font-bold" style="color: {{ $color }};">
+                                        {{ mb_strtoupper(mb_substr($account['name'], 0, 1)) }}
+                                    </span>
+                                </div>
+                                <div>
+                                    <h3 class="text-sm font-semibold text-zinc-900 dark:text-white leading-tight truncate max-w-[140px]">
+                                        {{ $account['name'] }}
+                                    </h3>
+                                    <span class="text-xs text-zinc-500 dark:text-zinc-400">
+                                        {{ $account['type_label'] ?? 'Cuenta' }}
+                                    </span>
+                                </div>
+                            </div>
 
                             @if(!($account['include_in_totals'] ?? true))
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">
+                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-400">
                                     <x-heroicon-m-eye-slash class="w-3 h-3" />
-                                    Excluida
                                 </span>
                             @endif
                         </div>
 
-                        <h3 class="text-lg font-semibold text-zinc-900 dark:text-white truncate">
-                            {{ $account['name'] }}
-                        </h3>
+                        {{-- Balance Actual --}}
+                        <div class="mt-3">
+                            <p class="text-xs font-medium text-zinc-400 dark:text-zinc-500 mb-0.5">Balance Actual</p>
+                            <p class="text-2xl font-bold {{ $balance >= 0 ? 'text-zinc-900 dark:text-white' : 'text-rose-600 dark:text-rose-400' }}">
+                                ${{ number_format($balance, 2) }}
+                            </p>
+                        </div>
                     </div>
 
-                    {{-- Body --}}
-                    <div class="px-5 pb-5 pl-6 space-y-4">
-                        {{-- Balance Actual --}}
-                        <div>
-                            <p class="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">
-                                Balance Actual
-                            </p>
-                            <p class="text-2xl font-semibold {{ $account['current_balance'] >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400' }}">
-                                ${{ number_format($account['current_balance'], 2) }}
-                            </p>
+                    {{-- Stats strip --}}
+                    <div class="mx-5 mb-4 bg-zinc-50 dark:bg-zinc-800/60 rounded-lg p-3">
+                        <div class="flex items-center justify-between mb-2.5">
+                            <span class="text-xs font-medium text-zinc-500 dark:text-zinc-400">Periodo</span>
+                            <span class="text-sm font-bold {{ $monthBalance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400' }}">
+                                {{ $monthBalance >= 0 ? '+' : '' }}${{ number_format($monthBalance, 2) }}
+                            </span>
                         </div>
-
-                        {{-- Separator --}}
-                        <div class="border-t border-zinc-100 dark:border-zinc-800"></div>
-
-                        {{-- Balance del Mes --}}
-                        <div class="bg-zinc-50 dark:bg-zinc-800/50 rounded-lg p-3 space-y-2">
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm font-medium text-zinc-600 dark:text-zinc-300">
-                                    Balance del Periodo
-                                </span>
-                                <span class="text-base font-semibold {{ $account['month_balance'] >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400' }}">
-                                    {{ $account['month_balance'] >= 0 ? '+' : '' }}${{ number_format($account['month_balance'], 2) }}
-                                </span>
+                        <div class="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-700">
+                            <div>
+                                <p class="flex items-center gap-1 text-xs text-zinc-400 dark:text-zinc-500 mb-0.5">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
+                                    Ingresos
+                                </p>
+                                <p class="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                                    ${{ number_format($account['month_income'], 2) }}
+                                </p>
                             </div>
-
-                            <div class="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-700">
-                                <div class="flex flex-col">
-                                    <span class="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400 mb-0.5">
-                                        <x-heroicon-m-arrow-trending-up class="w-3 h-3 text-emerald-500" />
-                                        Ingresos
-                                    </span>
-                                    <span class="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-                                        ${{ number_format($account['month_income'], 2) }}
-                                    </span>
-                                </div>
-                                <div class="flex flex-col">
-                                    <span class="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400 mb-0.5">
-                                        <x-heroicon-m-arrow-trending-down class="w-3 h-3 text-rose-500" />
-                                        Gastos
-                                    </span>
-                                    <span class="text-sm font-semibold text-rose-600 dark:text-rose-400">
-                                        ${{ number_format($account['month_expense'], 2) }}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {{-- Stats --}}
-                        <div class="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
-                            <div class="flex items-center gap-1.5">
-                                <x-heroicon-m-receipt-refund class="w-3.5 h-3.5" />
-                                <span>{{ $account['transaction_count'] }} transacciones</span>
-                            </div>
-                            <div class="flex items-center gap-1.5">
-                                <x-heroicon-m-banknotes class="w-3.5 h-3.5" />
-                                <span>${{ number_format($account['initial_balance'], 0) }} inicial</span>
+                            <div>
+                                <p class="flex items-center gap-1 text-xs text-zinc-400 dark:text-zinc-500 mb-0.5">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block"></span>
+                                    Gastos
+                                </p>
+                                <p class="text-sm font-semibold text-rose-600 dark:text-rose-400">
+                                    ${{ number_format($account['month_expense'], 2) }}
+                                </p>
                             </div>
                         </div>
                     </div>
 
                     {{-- Footer --}}
-                    <div class="px-5 pb-5 pl-6">
+                    <div class="px-5 pb-4 flex items-center justify-between">
+                        <span class="text-xs text-zinc-400 dark:text-zinc-500 flex items-center gap-1">
+                            <x-heroicon-m-receipt-refund class="w-3 h-3" />
+                            {{ $account['transaction_count'] }} transacciones
+                        </span>
                         <a href="{{ route('filament.app.resources.accounts.view', ['record' => $account['id']]) }}"
-                           class="block w-full text-center px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700">
-                            Ver Detalles
+                           class="text-xs font-medium px-3 py-1.5 rounded-lg transition-colors hover:text-white"
+                           style="background-color: {{ $color }}20; color: {{ $color }}; border: 1px solid {{ $color }}40;"
+                           onmouseover="this.style.backgroundColor='{{ $color }}'; this.style.color='white';"
+                           onmouseout="this.style.backgroundColor='{{ $color }}20'; this.style.color='{{ $color }}';">
+                            Ver Detalles →
                         </a>
                     </div>
                 </div>
             @endforeach
 
             {{-- Empty state --}}
-            @if(count($this->getViewData()['accounts']) === 0)
+            @if(count($accounts) === 0)
                 <div class="col-span-full">
-                    <div class="text-center py-16 bg-zinc-50 dark:bg-zinc-900 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700">
+                    <div class="text-center py-16 bg-zinc-50 dark:bg-zinc-900 rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700">
                         <x-heroicon-o-building-library class="w-12 h-12 text-zinc-400 mx-auto mb-4" />
-                        <h3 class="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
-                            No tienes cuentas creadas
-                        </h3>
+                        <h3 class="text-lg font-semibold text-zinc-900 dark:text-white mb-2">No tienes cuentas creadas</h3>
                         <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-6">
                             Crea tu primera cuenta para comenzar a gestionar tus finanzas
                         </p>

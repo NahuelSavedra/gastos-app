@@ -77,6 +77,14 @@ class Account extends Model
     }
 
     /**
+     * Tarjeta de crédito vinculada (cuando account_type = credit_card)
+     */
+    public function creditCard(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(CreditCard::class);
+    }
+
+    /**
      * Obtener el balance actual calculado (con caché)
      */
     public function getCurrentBalanceAttribute(): float

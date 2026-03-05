@@ -13,6 +13,7 @@ use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Session;
@@ -137,47 +138,93 @@ class TransactionResource extends Resource
             ->modifyQueryUsing(fn ($query) => $query->with(['category', 'account']))
             ->columns([
                 Tables\Columns\TextColumn::make('date')
-                    ->label('Date')
+                    ->label('Fecha')
                     ->date('d/m/Y')
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('title')
-                    ->label('Title')
+                    ->label('Título')
                     ->searchable()
+                    ->description(fn ($record) => $record->description ? str($record->description)->limit(50) : null)
                     ->limit(40),
 
                 Tables\Columns\TextColumn::make('category.name')
-                    ->label('Category')
+                    ->label('Categoría')
                     ->sortable()
-                    ->searchable(),
+                    ->badge()
+                    ->color('gray'),
+
                 Tables\Columns\TextColumn::make('type')
                     ->badge()
                     ->color(fn ($record) => $record->type === 'income' ? 'success' : 'danger')
-                    ->label('Type')
+                    ->label('Tipo')
                     ->formatStateUsing(fn ($state) => $state === 'income' ? 'Ingreso' : 'Gasto'),
 
                 Tables\Columns\TextColumn::make('amount')
-                    ->label('Amount')
-                    ->money('ARS', true) // ajustá tu moneda
-                    ->sortable(),
+                    ->label('Monto')
+                    ->money('ARS', true)
+                    ->sortable()
+                    ->color(fn ($record) => $record->type === 'income' ? 'success' : 'danger'),
 
                 Tables\Columns\TextColumn::make('account.name')
-                    ->label('Account')
+                    ->label('Cuenta')
                     ->sortable()
-                    ->searchable(),
+                    ->badge()
+                    ->color('primary'),
             ])
             ->defaultSort('date', 'desc')
+            ->searchable()
             ->filters([
-                Tables\Filters\SelectFilter::make('type')
-                    ->options(['income' => 'Income', 'expense' => 'Expense']),
-                Tables\Filters\SelectFilter::make('category_id')
-                    ->relationship('category', 'name')
-                    ->label('Category'),
                 Tables\Filters\SelectFilter::make('account_id')
-                    ->relationship('account', 'name')
-                    ->label('Account'),
+                    ->label('Cuenta')
+                    ->options(fn () => Account::orderBy('name')->pluck('name', 'id'))
+                    ->multiple()
+                    ->preload()
+                    ->searchable(),
+
+                Tables\Filters\SelectFilter::make('type')
+                    ->label('Tipo')
+                    ->options(['income' => 'Ingresos', 'expense' => 'Gastos']),
+
+                Tables\Filters\SelectFilter::make('category_id')
+                    ->label('Categoría')
+                    ->relationship('category', 'name')
+                    ->multiple()
+                    ->preload()
+                    ->searchable(),
+
+                Tables\Filters\Filter::make('date_range')
+                    ->label('Mes')
+                    ->form([
+                        Forms\Components\Select::make('month')
+                            ->label('Mes')
+                            ->options(function () {
+                                $months = [];
+                                for ($i = 0; $i < 13; $i++) {
+                                    $date = now()->subMonths($i);
+                                    $months[$date->format('Y-m')] = ucfirst($date->translatedFormat('F Y'));
+                                }
+                                return $months;
+                            })
+                            ->placeholder('Todos los meses'),
+                    ])
+                    ->query(function ($query, array $data) {
+                        if (empty($data['month'])) {
+                            return $query;
+                        }
+                        [$year, $month] = explode('-', $data['month']);
+                        return $query->whereYear('date', $year)->whereMonth('date', $month);
+                    })
+                    ->indicateUsing(function (array $data): ?string {
+                        if (empty($data['month'])) {
+                            return null;
+                        }
+                        return 'Mes: ' . ucfirst(\Carbon\Carbon::createFromFormat('Y-m', $data['month'])->translatedFormat('F Y'));
+                    }),
             ])
-            ->paginated([10, 25, 50])
+            ->filtersLayout(FiltersLayout::AboveContent)
+            ->filtersFormColumns(4)
+            ->paginated([15, 25, 50, 100])
             ->actions([
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\Action::make('duplicate')

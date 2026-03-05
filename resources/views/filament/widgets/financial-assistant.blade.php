@@ -2,13 +2,15 @@
     <x-filament::section>
         <x-slot name="heading">
             <div class="flex items-center gap-2">
-                <x-heroicon-o-cpu-chip class="w-5 h-5 text-primary-500" />
+                <div class="w-6 h-6 rounded-full bg-gradient-to-br from-primary-500 to-violet-600 flex items-center justify-center">
+                    <x-heroicon-m-sparkles class="w-3.5 h-3.5 text-white" />
+                </div>
                 Asistente Financiero
             </div>
         </x-slot>
 
         <x-slot name="description">
-            Puedo ayudarte a crear transacciones, consultar gastos y mas
+            Puedo ayudarte a crear transacciones, consultar gastos y más
         </x-slot>
 
         <x-slot name="headerEnd">
@@ -18,91 +20,107 @@
                 wire:click="clearConversation"
                 icon="heroicon-o-arrow-path"
             >
-                Nueva conversacion
+                Nueva conversación
             </x-filament::button>
         </x-slot>
 
         <div class="space-y-4">
-            <!-- Messages Container -->
-            <div class="h-96 overflow-y-auto space-y-3 p-4 bg-zinc-50 dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800">
+            {{-- Messages Container --}}
+            <div class="h-96 overflow-y-auto space-y-4 p-4 bg-zinc-50 dark:bg-zinc-950 rounded-xl border border-zinc-200 dark:border-zinc-800"
+                 id="chat-messages"
+                 x-data
+                 x-init="$el.scrollTop = $el.scrollHeight"
+                 x-on:livewire:update.window="setTimeout(() => $el.scrollTop = $el.scrollHeight, 50)">
+
                 @forelse($messages as $msg)
-                    <div class="flex {{ $msg['role'] === 'user' ? 'justify-end' : 'justify-start' }}">
-                        <div class="max-w-[85%] rounded-lg px-4 py-3 {{ $msg['role'] === 'user' ? 'bg-zinc-700 dark:bg-zinc-600 text-white' : 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800' }}">
-                            @if($msg['role'] === 'user')
-                                <div class="text-sm font-medium mb-1 text-zinc-300">Tu</div>
-                            @else
-                                <div class="flex items-center gap-1.5 text-sm font-medium mb-1 text-zinc-600 dark:text-zinc-400">
-                                    <x-heroicon-m-cpu-chip class="w-3.5 h-3.5" />
-                                    Asistente
+                    @if($msg['role'] === 'user')
+                        {{-- User message --}}
+                        <div class="flex justify-end">
+                            <div class="max-w-[80%]">
+                                <div class="bg-gradient-to-br from-primary-500 to-primary-600 text-white rounded-2xl rounded-tr-sm px-4 py-3 shadow-sm">
+                                    <div class="text-sm whitespace-pre-wrap leading-relaxed">{{ $msg['content'] }}</div>
                                 </div>
-                            @endif
-
-                            <div class="text-sm whitespace-pre-wrap {{ $msg['role'] === 'user' ? 'text-white' : 'text-zinc-900 dark:text-zinc-100' }}">
-                                {{ $msg['content'] }}
-                            </div>
-
-                            <div class="text-xs mt-2 {{ $msg['role'] === 'user' ? 'text-zinc-400' : 'text-zinc-500 dark:text-zinc-500' }}">
-                                {{ \Carbon\Carbon::parse($msg['created_at'])->diffForHumans() }}
+                                <p class="text-xs text-zinc-400 mt-1 text-right">
+                                    {{ \Carbon\Carbon::parse($msg['created_at'])->diffForHumans() }}
+                                </p>
                             </div>
                         </div>
-                    </div>
+                    @else
+                        {{-- Assistant message --}}
+                        <div class="flex justify-start gap-2.5">
+                            <div class="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-primary-500 to-violet-600 flex items-center justify-center mt-0.5">
+                                <x-heroicon-m-cpu-chip class="w-4 h-4 text-white" />
+                            </div>
+                            <div class="max-w-[80%]">
+                                <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
+                                    <div class="text-sm whitespace-pre-wrap text-zinc-800 dark:text-zinc-100 leading-relaxed">{{ $msg['content'] }}</div>
+                                </div>
+                                <p class="text-xs text-zinc-400 mt-1">
+                                    {{ \Carbon\Carbon::parse($msg['created_at'])->diffForHumans() }}
+                                </p>
+                            </div>
+                        </div>
+                    @endif
                 @empty
-                    <div class="text-center text-zinc-500 dark:text-zinc-400 py-12">
-                        <x-heroicon-o-hand-raised class="w-12 h-12 text-zinc-400 mx-auto mb-4" />
-                        <p class="text-lg font-medium mb-2">Hola! Soy tu asistente financiero</p>
-                        <div class="text-sm space-y-2 max-w-md mx-auto">
-                            <p class="font-medium">Puedo ayudarte a:</p>
-                            <ul class="text-left space-y-1.5">
-                                <li class="flex items-start gap-2">
-                                    <x-heroicon-m-plus-circle class="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" />
-                                    <span><strong>Crear transacciones:</strong> "Gaste 500 en cafe ayer"</span>
-                                </li>
-                                <li class="flex items-start gap-2">
-                                    <x-heroicon-m-chart-bar class="w-4 h-4 text-sky-500 mt-0.5 flex-shrink-0" />
-                                    <span><strong>Consultar gastos:</strong> "Cuanto gaste en restaurantes este mes?"</span>
-                                </li>
-                                <li class="flex items-start gap-2">
-                                    <x-heroicon-m-wallet class="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
-                                    <span><strong>Ver balances:</strong> "Cual es mi balance actual?"</span>
-                                </li>
-                                <li class="flex items-start gap-2">
-                                    <x-heroicon-m-question-mark-circle class="w-4 h-4 text-zinc-500 mt-0.5 flex-shrink-0" />
-                                    <span><strong>Responder preguntas:</strong> sobre tus finanzas</span>
-                                </li>
-                            </ul>
+                    {{-- Empty state --}}
+                    <div class="flex flex-col items-center justify-center h-full text-center py-6">
+                        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-violet-600 flex items-center justify-center mb-4 shadow-lg">
+                            <x-heroicon-o-sparkles class="w-7 h-7 text-white" />
+                        </div>
+                        <p class="text-base font-semibold text-zinc-800 dark:text-zinc-200 mb-1">Hola! Soy tu asistente financiero</p>
+                        <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-5">Preguntame sobre tus finanzas o pedime que cree transacciones</p>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-sm text-left">
+                            @foreach([
+                                ['icon' => 'heroicon-m-plus-circle', 'color' => 'text-emerald-500', 'text' => '"Gaste 500 en café ayer"'],
+                                ['icon' => 'heroicon-m-chart-bar', 'color' => 'text-sky-500', 'text' => '"¿Cuánto gasté este mes?"'],
+                                ['icon' => 'heroicon-m-wallet', 'color' => 'text-amber-500', 'text' => '"¿Cuál es mi balance?"'],
+                                ['icon' => 'heroicon-m-tag', 'color' => 'text-violet-500', 'text' => '"Top gastos de restaurantes"'],
+                            ] as $suggestion)
+                                <button
+                                    wire:click="$set('message', {{ json_encode(trim($suggestion['text'], '"')) }})"
+                                    class="flex items-center gap-2 p-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-primary-300 dark:hover:border-primary-700 hover:bg-primary-50 dark:hover:bg-primary-950/20 transition-colors text-left group"
+                                >
+                                    <x-dynamic-component :component="$suggestion['icon']" class="w-4 h-4 {{ $suggestion['color'] }} flex-shrink-0" />
+                                    <span class="text-xs text-zinc-600 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-zinc-200">{{ $suggestion['text'] }}</span>
+                                </button>
+                            @endforeach
                         </div>
                     </div>
                 @endforelse
 
                 @if($isLoading)
-                    <div class="flex justify-start">
-                        <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-4 py-3">
-                            <div class="flex items-center space-x-2">
-                                <svg class="animate-spin h-4 w-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                <span class="text-sm text-zinc-600 dark:text-zinc-400">Pensando...</span>
+                    <div class="flex justify-start gap-2.5">
+                        <div class="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-primary-500 to-violet-600 flex items-center justify-center">
+                            <x-heroicon-m-cpu-chip class="w-4 h-4 text-white" />
+                        </div>
+                        <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
+                            <div class="flex items-center gap-1.5">
+                                <span class="w-2 h-2 bg-primary-400 rounded-full animate-bounce" style="animation-delay: 0ms"></span>
+                                <span class="w-2 h-2 bg-primary-400 rounded-full animate-bounce" style="animation-delay: 150ms"></span>
+                                <span class="w-2 h-2 bg-primary-400 rounded-full animate-bounce" style="animation-delay: 300ms"></span>
                             </div>
                         </div>
                     </div>
                 @endif
             </div>
 
-            <!-- Input Form -->
+            {{-- Input Form --}}
             <form wire:submit="sendMessage" class="flex gap-2">
-                <input
-                    type="text"
-                    wire:model="message"
-                    placeholder="Escribe tu mensaje..."
-                    class="flex-1 rounded-lg border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                    @if($isLoading) disabled @endif
-                    autofocus
-                />
+                <div class="flex-1 relative">
+                    <input
+                        type="text"
+                        wire:model="message"
+                        placeholder="Escribe tu mensaje..."
+                        class="w-full rounded-xl border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500 pr-4 py-3"
+                        @if($isLoading) disabled @endif
+                    />
+                </div>
                 <x-filament::button
                     type="submit"
                     :disabled="$isLoading"
                     icon="heroicon-o-paper-airplane"
+                    class="rounded-xl px-4"
                 >
                     Enviar
                 </x-filament::button>

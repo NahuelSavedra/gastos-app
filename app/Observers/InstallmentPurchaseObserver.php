@@ -3,12 +3,18 @@
 namespace App\Observers;
 
 use App\Models\InstallmentPurchase;
+use App\Services\InstallmentPurchaseService;
 
 class InstallmentPurchaseObserver
 {
+    public function __construct(
+        private InstallmentPurchaseService $service
+    ) {}
+
     public function created(InstallmentPurchase $purchase): void
     {
         $this->clearCaches($purchase);
+        $this->service->createLinkedTransaction($purchase);
     }
 
     public function updated(InstallmentPurchase $purchase): void
@@ -23,10 +29,13 @@ class InstallmentPurchaseObserver
                 \Illuminate\Support\Facades\Cache::forget("credit_card_monthly_{$oldCardId}");
             }
         }
+
+        $this->service->syncLinkedTransaction($purchase);
     }
 
     public function deleted(InstallmentPurchase $purchase): void
     {
+        $this->service->deleteLinkedTransaction($purchase);
         $this->clearCaches($purchase);
     }
 

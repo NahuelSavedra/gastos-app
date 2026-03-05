@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\AccountResource\Pages;
 
 use App\Filament\Resources\AccountResource;
+use App\Filament\Resources\TransactionResource;
 use App\Models\Category;
 use App\Models\Transaction;
 use Carbon\Carbon;
@@ -58,7 +59,14 @@ class ViewAccount extends ViewRecord
     {
         return [
             Actions\EditAction::make()
-                ->label('Editar Cuenta'),
+                ->label('Editar'),
+            Actions\Action::make('view_transactions')
+                ->label('Ver Transacciones')
+                ->icon('heroicon-o-banknotes')
+                ->color('gray')
+                ->url(fn () => TransactionResource::getUrl('index', [
+                    'tableFilters[account_id][values][0]' => $this->record->id,
+                ])),
             Actions\Action::make('new_transaction')
                 ->label('Nueva Transacción')
                 ->icon('heroicon-o-plus-circle')
@@ -75,8 +83,15 @@ class ViewAccount extends ViewRecord
         $selectedDate = $this->getSelectedDate();
         $excludedCategoryIds = Category::where('name', 'Transfer')->pluck('id')->toArray();
 
+        // Credit card linked to this account (only for credit_card type accounts)
+        $creditCard = null;
+        if ($account->account_type === 'credit_card') {
+            $creditCard = $account->creditCard()->with(['installmentPurchases' => fn ($q) => $q->active()])->first();
+        }
+
         return [
             'account' => $account,
+            'creditCard' => $creditCard,
             'selectedMonth' => $this->month,
             'monthLabel' => ucfirst($selectedDate->translatedFormat('F Y')),
             'monthOptions' => $this->getMonthOptions(),

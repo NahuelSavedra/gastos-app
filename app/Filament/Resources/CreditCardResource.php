@@ -46,10 +46,9 @@ class CreditCardResource extends Resource
                                 Account::where('account_type', 'credit_card')
                                     ->pluck('name', 'id')
                             )
-                            ->nullable()
+                            ->required()
                             ->searchable()
-                            ->placeholder('Seleccionar cuenta (opcional)')
-                            ->helperText('Cuenta de tipo Tarjeta de Crédito asociada'),
+                            ->helperText('Requerida para registrar gastos de la tarjeta'),
 
                         Forms\Components\TextInput::make('last_four')
                             ->label('Últimos 4 dígitos')

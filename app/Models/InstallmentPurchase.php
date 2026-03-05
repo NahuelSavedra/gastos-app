@@ -13,6 +13,7 @@ class InstallmentPurchase extends Model
 
     protected $fillable = [
         'credit_card_id',
+        'transaction_id',
         'category_id',
         'title',
         'store',
@@ -40,6 +41,11 @@ class InstallmentPurchase extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function transaction(): BelongsTo
+    {
+        return $this->belongsTo(Transaction::class);
     }
 
     /**

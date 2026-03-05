@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\InstallmentPurchaseResource\Pages;
+use App\Filament\Resources\TransactionResource;
 use App\Models\Category;
 use App\Models\CreditCard;
 use App\Models\InstallmentPurchase;
@@ -139,6 +140,7 @@ class InstallmentPurchaseResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn ($query) => $query->with(['transaction']))
             ->columns([
                 Tables\Columns\TextColumn::make('title')
                     ->label('Descripción')
@@ -182,6 +184,15 @@ class InstallmentPurchaseResource extends Resource
                         'success' => 'Completada',
                         'warning' => 'Activa',
                     ]),
+
+                Tables\Columns\TextColumn::make('transaction_id')
+                    ->label('Transacción')
+                    ->getStateUsing(fn (InstallmentPurchase $record) => $record->transaction_id ? "#{$record->transaction_id}" : '—')
+                    ->url(fn (InstallmentPurchase $record) => $record->transaction_id
+                        ? TransactionResource::getUrl('edit', ['record' => $record->transaction_id])
+                        : null)
+                    ->openUrlInNewTab()
+                    ->color(fn (InstallmentPurchase $record) => $record->transaction_id ? 'primary' : 'gray'),
             ])
             ->defaultSort('first_payment_date', 'desc')
             ->filters([
